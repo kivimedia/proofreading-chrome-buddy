@@ -91,10 +91,23 @@ div.popover .diff {
   margin-bottom: 10px;
   font-size: 13px;
   word-break: break-word;
+  cursor: pointer;
+  transition: background 0.12s;
 }
+div.popover .diff:hover {
+  background: #e6f7ed;
+  outline: 1px solid #0e6839;
+}
+div.popover .diff:hover .repl { text-decoration: underline; }
 div.popover .diff .orig { text-decoration: line-through; color: #a82424; }
 div.popover .diff .arrow { color: #697386; margin: 0 6px; }
 div.popover .diff .repl { color: #0e6839; font-weight: 500; }
+div.popover .diff-hint {
+  font-size: 10px;
+  color: #4f566b;
+  margin-top: 4px;
+  letter-spacing: 0.03em;
+}
 div.popover .actions {
   display: flex;
   gap: 6px;
@@ -306,6 +319,9 @@ export class OverlayRenderer {
 
     const diff = document.createElement("div");
     diff.className = "diff";
+    diff.setAttribute("role", "button");
+    diff.setAttribute("aria-label", `Replace with "${s.replacement}"`);
+    diff.title = "Click to apply this fix";
     const orig = document.createElement("span");
     orig.className = "orig";
     orig.textContent = s.original;
@@ -318,6 +334,11 @@ export class OverlayRenderer {
     repl.className = "repl";
     repl.textContent = s.replacement;
     diff.appendChild(repl);
+    diff.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.callbacks.onAccept(item);
+      this.hidePopover();
+    });
     this.popoverEl.appendChild(diff);
 
     const actions = document.createElement("div");
