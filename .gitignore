@@ -11,3 +11,7 @@ Thumbs.db
 # Personal: never commit a real Anthropic API key
 *.apikey
 **/secrets.json
+
+# Asset build intermediates
+assets/_frames/
+assets/demo-raw.*

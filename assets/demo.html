@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Proofreading Chrome Buddy - Demo</title>
+<style>
+  :root {
+    --bg-card: #ffffff;
+    --ink: #1a1f36;
+    --muted: #4f566b;
+    --line: #e3e8ee;
+    --line-soft: #f1f3f6;
+    --red: #e02424;
+    --red-bg: #fdecec;
+    --red-text: #a82424;
+    --green: #0e6839;
+    --green-bg: #e6f7ed;
+    --blurple: #5b6ef5;
+    --cycle: 10s;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: linear-gradient(135deg, #eef2f7 0%, #dde6f0 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    overflow: hidden;
+  }
+  body { display: flex; align-items: flex-start; justify-content: flex-start; }
+
+  .stage {
+    width: 1280px; height: 720px;
+    position: relative; overflow: hidden;
+    transform-origin: top left;
+  }
+
+  .compose {
+    width: 720px;
+    background: var(--bg-card);
+    border-radius: 10px;
+    box-shadow: 0 12px 36px rgba(15,23,42,0.25);
+    overflow: visible;
+    position: absolute;
+    left: 280px; top: 130px;
+  }
+  .compose-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    background: #404040;
+    color: #f4f5f7;
+    font-size: 13px; font-weight: 500;
+    border-radius: 10px 10px 0 0;
+  }
+  .compose-row { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); font-size: 13px; color: var(--muted); }
+  .compose-row .key { color: var(--muted); margin-right: 6px; }
+  .compose-row .val { color: var(--ink); }
+  .compose-body {
+    padding: 20px 18px 28px;
+    min-height: 130px;
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--ink);
+    position: relative;
+    overflow: visible;
+  }
+
+  .typed-line {
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    width: 0;
+    vertical-align: top;
+    animation: type calc(var(--cycle) * 0.30) steps(58, end) calc(var(--cycle) * 0.04) forwards infinite;
+  }
+  @keyframes type {
+    0%   { width: 0; }
+    100% { width: var(--text-width, 432px); }
+  }
+  /* caret removed - was visually overlapping the "i" and reading as "!" */
+
+  /* Typo word - underline auto-anchored as a child SVG positioned absolutely */
+  .swap-typo {
+    position: relative;
+    display: inline-block;
+    animation: swap-out var(--cycle) infinite both;
+  }
+  .swap-typo .wavy-svg {
+    position: absolute;
+    left: 0; width: 100%;
+    bottom: -3px;
+    height: 6px;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .swap-typo .wavy {
+    fill: none;
+    stroke: var(--red);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    opacity: 0;
+    animation: underline-life var(--cycle) infinite;
+  }
+  @keyframes underline-life {
+    0%,32%   { opacity: 0; }
+    36%,68%  { opacity: 1; }
+    72%,100% { opacity: 0; }
+  }
+  .swap-fixed {
+    display: inline-block;
+    animation: swap-in var(--cycle) infinite both;
+  }
+  @keyframes swap-out {
+    0%,67%   { opacity: 1; max-width: 200px; }
+    70%,100% { opacity: 0; max-width: 0; overflow: hidden; }
+  }
+  @keyframes swap-in {
+    0%,67%   { opacity: 0; max-width: 0; overflow: hidden; }
+    70%,100% { opacity: 1; max-width: 200px; }
+  }
+
+  /* Popover - placed relative to compose-body. Hardcoded x/y aligned to "recieved" position. */
+  .popover {
+    position: absolute;
+    left: 38px;
+    top: 64px;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 10px 32px rgba(15,23,42,0.25);
+    padding: 12px 14px;
+    width: 300px;
+    font-size: 13px;
+    color: var(--ink);
+    opacity: 0;
+    transform: translateY(-6px);
+    animation: popover-life var(--cycle) infinite;
+    z-index: 5;
+  }
+  @keyframes popover-life {
+    0%,40%   { opacity: 0; transform: translateY(-6px); }
+    44%,67%  { opacity: 1; transform: translateY(0); }
+    71%,100% { opacity: 0; transform: translateY(-6px); }
+  }
+  .popover .head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .popover .pill {
+    background: var(--red-bg); color: var(--red-text);
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 2px 8px; border-radius: 999px;
+  }
+  .popover .explain { color: var(--muted); font-size: 12px; }
+  .popover .diff {
+    background: #f7f8fa;
+    padding: 9px 11px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    animation: diff-hover var(--cycle) infinite;
+  }
+  @keyframes diff-hover {
+    0%,55%   { background: #f7f8fa; outline: 1px solid transparent; }
+    60%,67%  { background: var(--green-bg); outline: 1px solid var(--green); }
+    71%,100% { background: #f7f8fa; outline: 1px solid transparent; }
+  }
+  .popover .orig { text-decoration: line-through; color: var(--red-text); margin-right: 4px; }
+  .popover .arrow { color: var(--muted); margin: 0 6px; }
+  .popover .repl { color: var(--green); font-weight: 600; }
+  .popover .actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .popover button {
+    padding: 6px 14px; border-radius: 6px;
+    font-size: 12px; font-weight: 500;
+    border: 1px solid transparent; font-family: inherit;
+    cursor: pointer;
+  }
+  .popover .accept  { background: var(--blurple); color: #fff; border-color: var(--blurple); }
+  .popover .dismiss { background: #fff; color: var(--muted); border-color: #cbd2dc; }
+
+  /* Synthetic cursor */
+  .cursor {
+    position: absolute;
+    left: 940px; top: 540px;
+    width: 18px; height: 22px;
+    pointer-events: none;
+    z-index: 100;
+    animation: cursor-path var(--cycle) infinite;
+  }
+  .cursor svg { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
+  /* Path coordinates are in stage-space. Adjust empirically. */
+  @keyframes cursor-path {
+    0%,28%   { left: 940px; top: 540px; }     /* parked off the popover */
+    36%      { left: 338px; top: 284px; }     /* hovering the typo "recieved" */
+    44%,52%  { left: 338px; top: 284px; }
+    58%      { left: 458px; top: 362px; }     /* over the green "received" inside popover */
+    65%,73%  { left: 458px; top: 362px; }
+    100%     { left: 940px; top: 540px; }
+  }
+
+  /* Ripple at click time */
+  .ripple {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--blurple);
+    pointer-events: none;
+    z-index: 99;
+    left: 458px; top: 362px;
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+    animation: ripple-fire var(--cycle) infinite;
+  }
+  @keyframes ripple-fire {
+    0%,64%  { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+    66%     { opacity: 0.65; transform: translate(-50%, -50%) scale(0.6); }
+    71%     { opacity: 0; transform: translate(-50%, -50%) scale(3.0); }
+    100%    { opacity: 0; transform: translate(-50%, -50%) scale(3.0); }
+  }
+
+  /* Brand badge */
+  .badge {
+    position: absolute;
+    top: 22px; left: 22px;
+    background: var(--bg-card);
+    border-radius: 999px;
+    padding: 7px 14px 7px 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    box-shadow: 0 4px 16px rgba(15,23,42,0.12);
+    display: flex; align-items: center; gap: 8px;
+    z-index: 200;
+  }
+  .badge .dot {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--blurple);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .badge .price {
+    margin-left: 4px;
+    background: #e6efff;
+    color: #2347a8;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* Force a paint event every 33ms so CDP screencast emits continuous frames
+     (CSS compositor animations on transform/opacity alone don't always
+     trigger paint events that the recorder captures). */
+  .frame-pump {
+    position: absolute;
+    right: 1px; bottom: 1px;
+    width: 1px; height: 1px;
+    opacity: 0.01;
+    background: #fff;
+    animation: pump 0.033s linear infinite;
+  }
+  @keyframes pump {
+    0%   { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+    100% { box-shadow: 1px 0 0 0 rgba(0,0,0,0); }
+  }
+
+  /* Tagline */
+  .tagline {
+    position: absolute;
+    bottom: 26px;
+    left: 0; right: 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    z-index: 50;
+  }
+  .tagline strong { color: var(--ink); }
+</style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div class="badge">
+      <span class="dot">P</span>
+      <span>Proofreading Chrome Buddy</span>
+      <span class="price">~ $2 / mo</span>
+    </div>
+
+    <div class="compose">
+      <div class="compose-head">
+        <span>New Message</span>
+        <span class="controls">- []  x</span>
+      </div>
+      <div class="compose-row"><span class="key">To</span><span class="val">team@kivimedia.com</span></div>
+      <div class="compose-row"><span class="key">Subject</span><span class="val">Quick follow up</span></div>
+      <div class="compose-body" id="composeBody">
+        <span class="typed-line" id="typedLine"
+              style="--text-width: 432px;">i&nbsp;<span class="swap-typo">recieved<svg class="wavy-svg"><path class="wavy" d="M 0 3 C 1 1, 3 5, 4 3 C 5 1, 7 5, 8 3 C 9 1, 11 5, 12 3 C 13 1, 15 5, 16 3 C 17 1, 19 5, 20 3 C 21 1, 23 5, 24 3 C 25 1, 27 5, 28 3 C 29 1, 31 5, 32 3 C 33 1, 35 5, 36 3 C 37 1, 39 5, 40 3 C 41 1, 43 5, 44 3 C 45 1, 47 5, 48 3 C 49 1, 51 5, 52 3 C 53 1, 55 5, 56 3 C 57 1, 59 5, 60 3 C 61 1, 63 5, 64 3 C 65 1, 67 5, 68 3 C 69 1, 71 5, 72 3 C 73 1, 75 5, 76 3 C 77 1, 79 5, 80 3"/></svg></span><span class="swap-fixed">received</span>&nbsp;your email yesterday and wanted to follow up.</span>
+
+        <div class="popover">
+          <div class="head">
+            <span class="pill">spelling</span>
+            <span class="explain">misspelled - common typo</span>
+          </div>
+          <div class="diff">
+            <span class="orig">recieved</span>
+            <span class="arrow">&rarr;</span>
+            <span class="repl">received</span>
+          </div>
+          <div class="actions">
+            <button class="dismiss">Dismiss</button>
+            <button class="accept">Accept</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cursor">
+      <svg width="18" height="22" viewBox="0 0 18 22" xmlns="http://www.w3.org/2000/svg">
+        <path d="M1 1 L1 17 L5.5 13 L8 19 L11 17.5 L8.5 11.5 L14.5 11.5 Z"
+              fill="#ffffff" stroke="#1a1f36" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="ripple"></div>
+
+    <div class="tagline">
+      Live grammar &amp; spelling fixes in Gmail and Facebook &middot;
+      <strong>Powered by your own Claude API key</strong>
+    </div>
+    <div class="frame-pump"></div>
+  </div>
+
+<script>
+// All animations run from page load.
+</script>
+</body>
+</html>

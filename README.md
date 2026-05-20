@@ -4,6 +4,20 @@
 Claude API key. About $2/month. Your drafts never touch a third-party
 server.**
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Proofreading Chrome Buddy demo: typing a typo in a Gmail-style composer, hovering the wavy underline, clicking the suggested replacement to apply the fix" width="720" />
+</p>
+
+<p align="center">
+  <a href="#install-5-minutes"><strong>Install in 5 minutes &rarr;</strong></a>
+  &nbsp;&middot;&nbsp;
+  <a href="https://console.anthropic.com">Get an Anthropic API key</a>
+  &nbsp;&middot;&nbsp;
+  <a href="#what-it-costs-you-in-practice">See the costs</a>
+  &nbsp;&middot;&nbsp;
+  <a href="PRIVACY.md">Privacy</a>
+</p>
+
 Type an email or a Facebook post; wavy underlines appear under spelling
 mistakes, awkward phrasing, and tone issues. Hover any underline for a
 one-line fix. Click the fix to apply it. Select a clunky sentence and ask
@@ -14,6 +28,8 @@ drop in.
 No subscription. No backend. No telemetry. Your Anthropic key lives in
 `chrome.storage.local` on your device, and the only network destination
 the extension talks to is `api.anthropic.com`.
+
+> **If this saves you the Grammarly bill, [star the repo](https://github.com/kivimedia/proofreading-chrome-buddy/stargazers)** &mdash; helps it find other people who'd rather pay the AI company directly than a middleman.
 
 ---
 
@@ -221,3 +237,11 @@ PRs welcome.
 ## License
 
 MIT.
+
+---
+
+<p align="center">
+  Built by <a href="https://github.com/kivimedia">Kivi Media</a> &middot;
+  <a href="https://github.com/kivimedia/proofreading-chrome-buddy/issues">Open an issue</a> &middot;
+  <a href="https://github.com/kivimedia/proofreading-chrome-buddy/stargazers">Star the repo</a> if it earned its keep this month.
+</p>
