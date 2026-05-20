@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Gmail Claude Assistant",
-  "version": "0.1.0",
-  "description": "Grammarly-like writing assistant for Gmail, powered by Claude (BYOK).",
+  "name": "Proofreading Chrome Buddy",
+  "version": "0.2.0",
+  "description": "Live writing suggestions, rewrite, and reply drafts in Gmail and Facebook. Powered by Claude (BYOK).",
   "minimum_chrome_version": "116",
   "permissions": ["storage"],
   "host_permissions": [
     "https://mail.google.com/*",
+    "https://www.facebook.com/*",
     "https://api.anthropic.com/*"
   ],
   "background": {
@@ -20,6 +21,11 @@
       "run_at": "document_idle",
       "all_frames": true,
       "match_origin_as_fallback": true
+    },
+    {
+      "matches": ["https://www.facebook.com/*"],
+      "js": ["src/content/facebook-composer-detector.ts"],
+      "run_at": "document_idle"
     }
   ],
   "options_ui": {
@@ -28,7 +34,7 @@
   },
   "action": {
     "default_popup": "src/popup/index.html",
-    "default_title": "Gmail Claude Assistant",
+    "default_title": "Proofreading Chrome Buddy",
     "default_icon": {
       "16": "public/icons/icon-16.png",
       "48": "public/icons/icon-48.png",

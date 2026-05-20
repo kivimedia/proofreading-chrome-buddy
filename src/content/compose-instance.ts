@@ -1,7 +1,13 @@
 import { OverlayRenderer, type OverlayItem } from "./overlay-renderer";
-import { diffParagraphs, snapshotEditor } from "./paragraph-differ";
+import {
+  diffParagraphs,
+  GMAIL_CONFIG,
+  snapshotEditor,
+  type PlatformConfig,
+} from "./paragraph-differ";
 import { findRangeInBlock } from "./range-finder";
 import { findReplyConversation, ReplyAssist } from "./reply-assist";
+import { insertTextIntoEditor } from "./text-insert";
 import type {
   BackgroundMessage,
   BackgroundResponse,
@@ -14,6 +20,7 @@ const CACHE_CAP = 64;
 
 export class ComposeInstance {
   private editor: HTMLElement;
+  private config: PlatformConfig;
   private overlay: OverlayRenderer;
   private debounceTimer: number | null = null;
   private rafHandle: number | null = null;
@@ -38,8 +45,9 @@ export class ComposeInstance {
   private readonly viewportHandler: () => void;
   private readonly resizeObserver: ResizeObserver;
 
-  constructor(editor: HTMLElement) {
+  constructor(editor: HTMLElement, config: PlatformConfig = GMAIL_CONFIG) {
     this.editor = editor;
+    this.config = config;
     this.overlay = new OverlayRenderer({
       onAccept: (item) => this.handleAccept(item),
       onDismiss: (item) => this.handleDismiss(item),
@@ -64,7 +72,7 @@ export class ComposeInstance {
     if (this.destroyed) return;
     if (res.ok && res.data) {
       this.settings = res.data;
-      if (this.settings.features.replyDrafts) {
+      if (this.config.enableReplyAssist && this.settings.features.replyDrafts) {
         const conv = findReplyConversation(this.editor);
         if (conv) this.replyAssist = new ReplyAssist(this.editor, conv);
       }
@@ -100,7 +108,7 @@ export class ComposeInstance {
       return;
     }
 
-    const snap = snapshotEditor(this.editor);
+    const snap = snapshotEditor(this.editor, this.config);
     const changed = diffParagraphs(this.prevParagraphs, snap.paragraphs);
 
     if (changed.length === 0) {
@@ -161,7 +169,7 @@ export class ComposeInstance {
       this.overlay.setItems([]);
       return;
     }
-    const snap = snapshotEditor(this.editor);
+    const snap = snapshotEditor(this.editor, this.config);
     const items: OverlayItem[] = [];
     for (let i = 0; i < snap.paragraphs.length; i++) {
       const para = snap.paragraphs[i];
@@ -186,24 +194,13 @@ export class ComposeInstance {
     const liveRange = this.findFreshRange(item);
     if (!liveRange) return;
 
-    this.editor.focus();
-    const sel = window.getSelection();
-    if (!sel) return;
-    sel.removeAllRanges();
-    sel.addRange(liveRange);
-
-    // execCommand preserves Gmail's native undo stack (Ctrl-Z reverts the
-    // accepted suggestion as one step).
-    const ok = document.execCommand("insertText", false, item.suggestion.replacement);
-    if (!ok) {
-      // Fallback: write directly. Loses undo step but at least applies the fix.
-      liveRange.deleteContents();
-      liveRange.insertNode(document.createTextNode(item.suggestion.replacement));
-    }
+    // insertTextIntoEditor tries execCommand first (Gmail), then a
+    // synthetic beforeinput event (Lexical/Facebook), then direct DOM
+    // mutation as a last resort.
+    insertTextIntoEditor(this.editor, liveRange, item.suggestion.replacement);
 
     // Mark as dismissed so it doesn't re-render between now and the next check.
     this.dismissed.add(item.key);
-    // The input event fires from execCommand and will reschedule a check.
     this.repaint();
   }
 
@@ -234,7 +231,7 @@ export class ComposeInstance {
   // and char offsets. Protects against the stored Range being invalidated by
   // any DOM rerender since draw.
   private findFreshRange(item: OverlayItem): Range | null {
-    const snap = snapshotEditor(this.editor);
+    const snap = snapshotEditor(this.editor, this.config);
     for (let i = 0; i < snap.paragraphs.length; i++) {
       const para = snap.paragraphs[i];
       if (suggestionKey(para.hash, item.suggestion) !== item.key) continue;

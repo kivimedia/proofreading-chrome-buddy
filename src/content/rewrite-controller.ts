@@ -9,6 +9,7 @@ import type {
   BackgroundMessage,
   BackgroundResponse,
 } from "@/shared/types";
+import { insertTextIntoEditor } from "./text-insert";
 
 interface SelectionContext {
   editor: HTMLElement;
@@ -389,37 +390,11 @@ class RewriteController {
   private applyRewrite(): void {
     if (!this.current) return;
     if (this.rewriteText === "" || this.rewriteError) return;
-
-    const editor = this.current.editor;
-    if (!editor.isConnected) {
-      this.closeModal();
-      return;
-    }
-    editor.focus();
-    const sel = window.getSelection();
-    if (!sel) return;
-    sel.removeAllRanges();
-    try {
-      sel.addRange(this.current.range);
-    } catch {
-      this.closeModal();
-      return;
-    }
-    const ok = document.execCommand(
-      "insertText",
-      false,
+    insertTextIntoEditor(
+      this.current.editor,
+      this.current.range,
       this.rewriteText,
     );
-    if (!ok) {
-      try {
-        this.current.range.deleteContents();
-        this.current.range.insertNode(
-          document.createTextNode(this.rewriteText),
-        );
-      } catch {
-        /* ignore */
-      }
-    }
     this.closeModal();
   }
 

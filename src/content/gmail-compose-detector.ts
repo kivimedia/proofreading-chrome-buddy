@@ -1,4 +1,5 @@
 import { ComposeInstance } from "./compose-instance";
+import { GMAIL_CONFIG } from "./paragraph-differ";
 import { ensureRewriteController } from "./rewrite-controller";
 
 const EDITOR_SELECTOR =
@@ -9,7 +10,7 @@ const instances = new Map<HTMLElement, ComposeInstance>();
 function attach(editor: HTMLElement): void {
   if (instances.has(editor)) return;
   if (!editor.isConnected) return;
-  instances.set(editor, new ComposeInstance(editor));
+  instances.set(editor, new ComposeInstance(editor, GMAIL_CONFIG));
 }
 
 function scan(root: ParentNode): void {
@@ -50,6 +51,6 @@ if (document.readyState === "loading") {
 }
 
 console.debug(
-  "[gmail-claude-assistant] content script loaded in",
+  "[proofreading-chrome-buddy] gmail content script loaded in",
   location.href,
 );

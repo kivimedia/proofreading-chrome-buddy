@@ -5,11 +5,35 @@ export interface EditorSnapshot {
   paragraphNodes: HTMLElement[];
 }
 
-// Gmail compose: top-level <div> per visual line; empty line = <div><br></div>.
-// We treat each direct child block element as one "paragraph". When the
-// editor has no block children (rare initial state), the editor itself is one.
-export function snapshotEditor(editor: HTMLElement): EditorSnapshot {
-  const blocks = collectBlocks(editor);
+export interface PlatformConfig {
+  /** "children" -> each direct block child of the editor is a paragraph
+   *  (Gmail). "single" -> the entire editor is one paragraph (Facebook /
+   *  Lexical, where the inner DOM re-renders aggressively). */
+  blockStrategy: "children" | "single";
+  /** CSS selector to filter out (e.g. quoted history, signature). Empty
+   *  string means "no exclusions". */
+  excludeSelector: string;
+  /** Whether the reply-drafts UI applies on this platform. */
+  enableReplyAssist: boolean;
+}
+
+export const GMAIL_CONFIG: PlatformConfig = {
+  blockStrategy: "children",
+  excludeSelector: ".gmail_quote, blockquote, .gmail_signature",
+  enableReplyAssist: true,
+};
+
+export const FACEBOOK_CONFIG: PlatformConfig = {
+  blockStrategy: "single",
+  excludeSelector: "",
+  enableReplyAssist: false,
+};
+
+export function snapshotEditor(
+  editor: HTMLElement,
+  config: PlatformConfig = GMAIL_CONFIG,
+): EditorSnapshot {
+  const blocks = collectBlocks(editor, config);
   const paragraphs: Paragraph[] = blocks.map((block, i) => ({
     index: i,
     text: blockText(block),
@@ -19,14 +43,19 @@ export function snapshotEditor(editor: HTMLElement): EditorSnapshot {
   return { paragraphs, paragraphNodes: blocks };
 }
 
-// Skip quoted history (replies/forwards) and the user's own signature -
-// the user doesn't want grammar/spelling flags on either.
-const EXCLUDE_SELECTOR = ".gmail_quote, blockquote, .gmail_signature";
-
-function collectBlocks(editor: HTMLElement): HTMLElement[] {
+function collectBlocks(
+  editor: HTMLElement,
+  config: PlatformConfig,
+): HTMLElement[] {
+  if (config.blockStrategy === "single") return [editor];
   const direct = Array.from(editor.children).filter(
-    (c): c is HTMLElement =>
-      c instanceof HTMLElement && !c.matches(EXCLUDE_SELECTOR),
+    (c): c is HTMLElement => {
+      if (!(c instanceof HTMLElement)) return false;
+      if (config.excludeSelector && c.matches(config.excludeSelector)) {
+        return false;
+      }
+      return true;
+    },
   );
   if (direct.length === 0) return [editor];
   return direct;

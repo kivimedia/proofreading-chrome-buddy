@@ -1,50 +1,49 @@
-# Gmail Claude Assistant
+# Proofreading Chrome Buddy
 
-A Grammarly-like Chrome extension for Gmail, powered by Claude (Haiku 4.5 by default).
-Bring-your-own-key (BYOK): your Anthropic API key is stored in `chrome.storage.local`
-on your device and only ever sent to `api.anthropic.com` directly from the
-extension's service worker. No backend, no telemetry, no third party.
+A Grammarly-like Chrome extension for **Gmail and Facebook**, powered by
+Claude (Haiku 4.5 by default). Bring-your-own-key (BYOK): your Anthropic
+API key is stored in `chrome.storage.local` on your device and only ever
+sent to `api.anthropic.com` directly from the extension's service worker.
+No backend, no telemetry, no third party.
 
-**Status: Phases 1-6 complete.** All five features in the plan are live: live
-suggestions with popover + Accept/Dismiss, paragraph rewrite, reply drafts,
+**Status: Phases 1-7 complete.** All planned features are live: live
+suggestions with popover + Accept/Dismiss in Gmail compose and Facebook
+post/comment composers, paragraph rewrite, reply drafts (Gmail only),
 voice samples, custom instructions, and an ignore-word list.
 
 Plan + roadmap: `C:\Users\raviv\.claude\plans\lets-focus-on-email-kind-rocket.md`
+Phase 7 scope: `C:\Users\raviv\.claude\plans\rename-and-phase-7-fb.md`
 
 ## Features
 
-- **Live grammar/spelling/clarity check** in Gmail compose. Wavy-underline
-  overlay (red for spelling/grammar, blue for clarity/conciseness, amber for
-  tone). Hover for a popover with the suggested fix, explanation, and
-  Accept / Dismiss buttons. Accept uses `execCommand('insertText')` so
-  Gmail's native undo stack is preserved - Ctrl-Z reverts cleanly.
-- **Always-ignore words**: for spelling suggestions on single words, the
-  popover has an "Always ignore" link. Adds the word to your global list so
-  it's never flagged again on any email. Manage the list in Settings.
-- **Paragraph rewrite**: select text in a compose body, the floating
-  "Rewrite" pill appears, click it for a modal with 4 preset chips
-  (Default / Concise / Friendlier / More formal). Original and rewritten
-  text shown side by side, Apply replaces the selection in place.
-- **Reply drafts**: when a compose is opened in reply context (Gmail
-  conversation view), a "Suggest replies" pill appears at the top-right of
-  the editor. Click for 3 drafts: Formal / Friendly / Brief. Click a draft
-  to drop it into the reply editor.
-- **Your voice (rewrite + reply only)**: paste 2-3 sample emails in
-  Settings. Claude matches your tone, vocabulary, sentence rhythm, and
-  level of formality for rewrites and reply drafts.
-- **Custom instructions**: free-text style guide applied to all three
-  surfaces (grammar, rewrite, reply). Things like "Never use emdashes",
-  "Always sign with X", etc.
+- **Live grammar/spelling/clarity check** while you write.
+  - In **Gmail compose** (new emails + replies + forwards)
+  - In **Facebook composers** (feed posts, comments, replies to comments,
+    group posts, marketplace descriptions)
+  - Wavy-underline overlay (red for spelling/grammar, blue for
+    clarity/conciseness, amber for tone)
+  - Hover for a popover with the suggested fix, explanation, and
+    Accept / Dismiss buttons
+- **"Always ignore" link** in spelling popovers for single words: adds the
+  word to your global list so it's never flagged again on any surface
+- **Selection rewrite**: select text in any supported composer, the
+  floating "Rewrite" pill appears, click it for a modal with 4 preset
+  chips (Default / Concise / Friendlier / More formal)
+- **Reply drafts** (Gmail only): when a reply compose is open, a
+  "Suggest replies" pill appears with 3 drafts (Formal / Friendly /
+  Brief). Click one to drop it into the reply editor
+- **Your voice**: paste 2-3 of your sent messages in Settings -> Claude
+  matches your tone for rewrites and reply drafts
+- **Custom instructions**: free-text style guide applied to all surfaces
 - **Cost tracking**: extension popup shows today's input/output/cache
-  tokens and projects a monthly cost at today's pace.
+  tokens and projects a monthly cost at today's pace
 
 ## Running cost
 
 Heavy personal use targets ~**$2-3/month** at Claude Haiku 4.5 prices,
 achieved with prompt caching and paragraph-level diffing (unchanged
-paragraphs are not re-billed). Switch to Sonnet 4.6 in Settings for higher
-quality at ~5x the cost, or Opus 4.7 at ~20x. The popup shows your
-actual projected spend daily so you can choose.
+paragraphs are not re-billed). Adding Facebook to the mix adds maybe
+$0.50-$1/month for a typical user since FB posts are short.
 
 ## Privacy
 
@@ -54,7 +53,7 @@ Zero servers. Zero telemetry. The only network destination is
 ## Setup
 
 ```bash
-cd E:/FromC/projects/gmail-claude-assistant
+cd E:/FromC/projects/proofreading-chrome-buddy
 npm install
 npm run build
 ```
@@ -67,8 +66,8 @@ Then in Chrome:
 4. Click the extension's icon -> **Open settings**
 5. Paste an Anthropic API key (get one at https://console.anthropic.com -> Settings -> API Keys)
 6. Click **Test key**. Expect "Connected. Model echo: claude-haiku-4-5-..."
-7. Optionally paste 2-3 of your sent emails into "Voice samples" to give
-   Claude a sense of your writing style for rewrites and replies.
+7. Optionally paste a few of your past messages into "Voice samples" to
+   give Claude a sense of your writing style.
 
 ## Dev workflow
 
@@ -80,26 +79,25 @@ Then `chrome://extensions` -> Load unpacked -> `dist/`.
 
 ## End-to-end verification
 
+### Gmail
 1. Compose a new email and type:
-   `i recieved you're email yesterday and wanted to folow up with quesitons.`
-   Wait ~1.5s -> expect 4 red wavy underlines.
-2. Hover "recieved" -> popover shows "received" + explanation. Click
-   **Accept** -> text replaces in place. Ctrl-Z reverts.
-3. Hover "you're" -> click **Dismiss** -> underline disappears for the
-   session.
-4. Hover "folow" -> click **Always ignore "folow"** -> word added to
-   your ignore list (Settings -> Ignore Words). Verify the chip appears.
-5. Select a wordy sentence -> the blue **Rewrite** pill appears -> click
-   it -> modal opens -> click **Concise** chip -> tighter version
-   appears -> **Apply** replaces in place.
-6. Open an incoming email -> click Gmail's Reply -> the **Suggest replies**
-   pill appears at top-right of the reply box -> click -> 3 drafts
-   appear in a modal -> click one -> drops into the reply editor.
-7. Open the extension popup -> verify today's input/output tokens and
-   cost projection updated.
-8. Open DevTools -> Network on the service worker -> verify calls hit
-   `api.anthropic.com` and the response includes `cache_read_input_tokens`
-   after the second call (caching working).
+   `i recieved you're email yesterday and wanted to folow up.`
+   Wait ~1.5s -> expect 3 red wavy underlines.
+2. Hover "recieved" -> popover -> click **Accept** -> Ctrl-Z reverts.
+3. Select a wordy sentence -> blue **Rewrite** pill -> modal -> click
+   **Concise** -> Apply replaces in place.
+4. Open an incoming email -> click Reply -> **Suggest replies** pill
+   appears top-right -> click -> 3 drafts -> click one -> drops in.
+
+### Facebook
+1. Open https://www.facebook.com
+2. Click "What's on your mind, Ziv?" -> type
+   `this is a recieved test with you're errors`
+3. Wait ~1.5s -> wavy underlines on misspellings.
+4. Hover -> popover -> Accept replaces in place.
+5. Select a phrase -> Rewrite pill -> modal -> Apply replaces.
+6. On someone's post, click "Comment" -> same grammar check works in
+   the comment box.
 
 ## Architecture
 
@@ -109,25 +107,37 @@ src/
     service-worker.ts        Message router, key custody, prompt assembly
     anthropic-client.ts      fetch wrapper + cache_control + retries
   content/
-    gmail-compose-detector.ts  MutationObserver finds compose editors
-    compose-instance.ts        Per-editor: debounce + diff + suggestions
-    paragraph-differ.ts        Snapshot blocks + hash + diff (skips
-                               .gmail_quote, .gmail_signature, blockquote)
-    range-finder.ts            paragraph + [start,end) -> DOM Range
-    overlay-renderer.ts        Shadow-DOM SVG underlines + popover
-                               (Accept / Dismiss / Always ignore)
-    rewrite-controller.ts      Selection-triggered Rewrite pill + modal
-                               (4 preset chips, in-flight cancellation)
-    reply-assist.ts            Reply-context detector + Suggest replies
-                               pill + 3-draft modal
-  options/                   React settings (key, voice, instructions,
-                             ignore list, model picker, debounce)
-  popup/                     React popup (status, cost today, monthly
-                             projection)
+    gmail-compose-detector.ts     mail.google.com - finds compose editors
+    facebook-composer-detector.ts facebook.com - finds Lexical composers
+    compose-instance.ts           Per-editor (Gmail OR FB): debounce + diff
+    paragraph-differ.ts           PlatformConfig + snapshot + hash + diff
+    range-finder.ts               paragraph + [start,end) -> DOM Range
+    overlay-renderer.ts           Shadow-DOM SVG underlines + popover
+    rewrite-controller.ts         Selection-triggered Rewrite pill + modal
+    reply-assist.ts               Gmail-only Suggest replies + 3-draft modal
+    text-insert.ts                execCommand -> InputEvent -> DOM fallback
+  options/                   React settings UI
+  popup/                     React popup
   shared/
     types.ts                 Suggestion, Paragraph, ExtensionSettings, ...
     prompts.ts               Cached base prompts + Anthropic tool schemas
 ```
+
+## Platform handling
+
+`PlatformConfig` in [paragraph-differ.ts](src/content/paragraph-differ.ts)
+captures the per-platform differences:
+
+| Field             | Gmail                                          | Facebook |
+|-------------------|------------------------------------------------|----------|
+| blockStrategy     | "children" (each block child is a paragraph)   | "single" (whole editor is one paragraph; Lexical re-renders too aggressively to track block identity) |
+| excludeSelector   | `.gmail_quote, blockquote, .gmail_signature`   | (none)   |
+| enableReplyAssist | true                                           | false    |
+
+The text-insert helper in [text-insert.ts](src/content/text-insert.ts)
+tries `execCommand('insertText')` (works in Gmail), then a synthetic
+`beforeinput` event with `inputType: 'insertReplacementText'` (works in
+Lexical / Facebook), then direct DOM mutation as a last resort.
 
 ## BYOK + security
 
@@ -139,10 +149,9 @@ src/
   context, so a compromised webpage can't read it.
 - Calls go direct to `api.anthropic.com` from the service worker (CORS
   allowed with `anthropic-dangerous-direct-browser-access: true`).
-- `.gitignore` blocks `*.apikey`, `.env*`, `secrets.json`. Never commit
-  a real key.
+- `.gitignore` blocks `*.apikey`, `.env*`, `secrets.json`.
 
-## Phases that shipped
+## Phases shipped
 
 - **Phase 1**: scaffold, MV3 manifest, BYOK ping, options + popup.
 - **Phase 2**: paragraph-level diffing + debounce + Shadow-DOM SVG
@@ -156,6 +165,10 @@ src/
 - **Phase 6**: voice samples + custom instructions + ignore-word list
   (popover "Always ignore" + Settings chip list), manifest hardening,
   privacy policy.
+- **Phase 7**: Facebook support (post/comment composers via Lexical),
+  PlatformConfig abstraction, text-insert fallback chain for editors
+  that don't honour execCommand. Project rename from gmail-claude-assistant
+  to proofreading-chrome-buddy.
 
 ## Future ideas (not implemented)
 
@@ -164,6 +177,8 @@ src/
 - Chrome Web Store listing with proper icon and screenshots.
 - Multi-language UI for the options page (currently English only).
 - Google Docs support (canvas rendering needs a side-panel approach).
+- Messenger.com (separate domain, separate adapter).
+- LinkedIn, Twitter/X, Reddit.
 
 ## License
 

@@ -78,9 +78,10 @@ export function App() {
 
   return (
     <div className="wrap">
-      <h1>Gmail Claude Assistant</h1>
+      <h1>Proofreading Chrome Buddy</h1>
       <p className="subtitle">
-        Settings. Your API key never leaves this browser.
+        Live writing suggestions, rewrite, and reply drafts in Gmail and
+        Facebook. Your API key never leaves this browser.
       </p>
 
       <div className="section">

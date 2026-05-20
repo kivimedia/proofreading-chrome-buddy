@@ -1,7 +1,7 @@
 {
-  "name": "gmail-claude-assistant",
-  "version": "0.1.0",
-  "description": "Grammarly-like Gmail Chrome extension powered by Claude (BYOK)",
+  "name": "proofreading-chrome-buddy",
+  "version": "0.2.0",
+  "description": "Grammarly-like Chrome extension for Gmail + Facebook, powered by Claude (BYOK)",
   "private": true,
   "type": "module",
   "scripts": {

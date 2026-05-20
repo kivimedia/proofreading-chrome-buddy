@@ -50,7 +50,7 @@ export function App() {
 
   return (
     <div className="wrap">
-      <h1>Gmail Claude Assistant</h1>
+      <h1>Proofreading Chrome Buddy</h1>
 
       <div>
         {keyMissing ? (
