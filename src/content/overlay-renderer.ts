@@ -16,6 +16,7 @@ export interface OverlayItem {
 export interface OverlayCallbacks {
   onAccept(item: OverlayItem): void;
   onDismiss(item: OverlayItem): void;
+  onIgnoreWord(item: OverlayItem): void;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -96,8 +97,10 @@ div.popover .diff .arrow { color: #697386; margin: 0 6px; }
 div.popover .diff .repl { color: #0e6839; font-weight: 500; }
 div.popover .actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
 }
 div.popover button {
   padding: 5px 12px;
@@ -117,6 +120,17 @@ div.popover button.dismiss {
   background: #ffffff; color: #4f566b; border-color: #cbd2dc;
 }
 div.popover button.dismiss:hover { background: #f1f3f6; }
+div.popover button.ignore {
+  background: transparent;
+  color: #697386;
+  border: none;
+  padding: 4px 6px;
+  font-size: 11px;
+  margin-right: auto;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+div.popover button.ignore:hover { color: #1a1f36; }
 `;
 
 export class OverlayRenderer {
@@ -267,6 +281,22 @@ export class OverlayRenderer {
 
     const actions = document.createElement("div");
     actions.className = "actions";
+
+    // Only show "Always ignore" for word-level spelling suggestions; for
+    // grammar/clarity rewrites it doesn't make sense to ignore the phrase.
+    if (s.category === "spelling" && s.original.trim().split(/\s+/).length === 1) {
+      const ignore = document.createElement("button");
+      ignore.className = "ignore";
+      ignore.textContent = `Always ignore "${s.original.trim()}"`;
+      ignore.title = "Never flag this word again on any email";
+      ignore.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.callbacks.onIgnoreWord(item);
+        this.hidePopover();
+      });
+      actions.appendChild(ignore);
+    }
+
     const dismiss = document.createElement("button");
     dismiss.className = "dismiss";
     dismiss.textContent = "Dismiss";

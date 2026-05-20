@@ -50,6 +50,13 @@ export interface ExtensionSettings {
     replyDrafts: boolean;
   };
   debounceMs: number;
+  /** Free-text examples of the user's voice (sample emails). Used for
+   *  rewrite + reply prompts to make Claude match their tone. */
+  voiceSamples: string;
+  /** Free-text style guide / preferences applied to all surfaces. */
+  customInstructions: string;
+  /** Lowercased words/phrases the suggester must never flag. */
+  ignoreWords: string[];
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
@@ -62,6 +69,9 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
     replyDrafts: true,
   },
   debounceMs: 1500,
+  voiceSamples: "",
+  customInstructions: "",
+  ignoreWords: [],
 };
 
 export type BackgroundMessage =
@@ -76,7 +86,8 @@ export type BackgroundMessage =
     }
   | { kind: "get_usage" }
   | { kind: "get_settings" }
-  | { kind: "set_settings"; settings: Partial<ExtensionSettings> };
+  | { kind: "set_settings"; settings: Partial<ExtensionSettings> }
+  | { kind: "ignore_word"; word: string };
 
 export interface BackgroundResponse<T = unknown> {
   ok: boolean;

@@ -43,6 +43,7 @@ export class ComposeInstance {
     this.overlay = new OverlayRenderer({
       onAccept: (item) => this.handleAccept(item),
       onDismiss: (item) => this.handleDismiss(item),
+      onIgnoreWord: (item) => this.handleIgnoreWord(item),
     });
 
     this.inputHandler = () => this.scheduleCheck();
@@ -210,6 +211,23 @@ export class ComposeInstance {
     if (this.destroyed) return;
     this.dismissed.add(item.key);
     this.repaint();
+  }
+
+  private handleIgnoreWord(item: OverlayItem): void {
+    if (this.destroyed) return;
+    const word = item.suggestion.original.trim();
+    // Locally drop this suggestion + any other cached suggestion targeting
+    // the same word in any paragraph.
+    const lower = word.toLowerCase();
+    for (const [, sugs] of this.suggestionsByHash) {
+      for (let i = sugs.length - 1; i >= 0; i--) {
+        if (sugs[i].original.trim().toLowerCase() === lower) sugs.splice(i, 1);
+      }
+    }
+    this.dismissed.add(item.key);
+    this.repaint();
+    // Persist so future checks (and other tabs) honour it.
+    void sendBg({ kind: "ignore_word", word });
   }
 
   // Re-derive the Range against the current DOM using the same paragraph hash

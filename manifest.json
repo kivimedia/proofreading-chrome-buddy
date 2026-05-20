@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Grammarly-like writing assistant for Gmail, powered by Claude (BYOK).",
   "minimum_chrome_version": "116",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage"],
   "host_permissions": [
     "https://mail.google.com/*",
     "https://api.anthropic.com/*"

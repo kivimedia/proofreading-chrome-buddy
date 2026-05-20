@@ -30,7 +30,7 @@ h1 { margin: 0 0 4px; font-size: 22px; }
 
 label { display: block; font-size: 13px; color: #1a1f36; margin-bottom: 6px; font-weight: 500; }
 
-input[type="password"], input[type="text"], select {
+input[type="password"], input[type="text"], select, textarea {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #cbd2dc;
@@ -39,8 +39,44 @@ input[type="password"], input[type="text"], select {
   color: #1a1f36;
   background: #fff;
   font-family: inherit;
+  line-height: 1.45;
 }
-input:focus, select:focus { outline: none; border-color: #5b6ef5; box-shadow: 0 0 0 3px rgba(91, 110, 245, 0.18); }
+textarea { resize: vertical; min-height: 90px; font-family: inherit; }
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: #5b6ef5;
+  box-shadow: 0 0 0 3px rgba(91, 110, 245, 0.18);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0 8px;
+  min-height: 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  background: #e6efff;
+  color: #2347a8;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.chip button {
+  background: transparent;
+  color: #2347a8;
+  border: none;
+  padding: 0 4px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.chip button:hover { color: #a82424; background: transparent; }
+.chip.empty { background: transparent; color: #697386; font-style: italic; padding-left: 0; }
 
 .row { display: flex; gap: 10px; align-items: center; }
 .row > input { flex: 1; }

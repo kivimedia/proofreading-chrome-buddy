@@ -173,6 +173,54 @@ export function App() {
       </div>
 
       <div className="section">
+        <h2>Your Voice (Rewrite + Reply)</h2>
+        <label htmlFor="voice">Voice samples</label>
+        <textarea
+          id="voice"
+          rows={6}
+          placeholder={
+            "Paste 2-3 short emails you've written. Claude will match your tone, vocabulary, sentence rhythm and formality when rewriting or drafting replies. Plain text, no headers needed."
+          }
+          value={settings.voiceSamples}
+          onChange={(e) => save({ voiceSamples: e.target.value })}
+        />
+        <p className="help">
+          Used only for the Rewrite modal and Reply drafts (not for grammar
+          checks). Empty = Claude uses its default professional tone.
+        </p>
+
+        <label htmlFor="ci" style={{ marginTop: 18 }}>
+          Custom instructions
+        </label>
+        <textarea
+          id="ci"
+          rows={3}
+          placeholder={
+            "Examples: \"Never use emdashes.\" / \"Always sign with 'Best, Ziv'.\" / \"Don't use the word 'leverage'.\""
+          }
+          value={settings.customInstructions}
+          onChange={(e) => save({ customInstructions: e.target.value })}
+        />
+        <p className="help">
+          Applied to all surfaces (grammar, rewrite, reply). Keep it short -
+          the more rules, the less Claude can hold in attention.
+        </p>
+      </div>
+
+      <div className="section">
+        <h2>Ignore Words</h2>
+        <p className="help">
+          Words the grammar checker will never flag. Useful for proper nouns,
+          jargon, and intentional misspellings. Click the &times; on a chip
+          to remove it.
+        </p>
+        <IgnoreWordsEditor
+          words={settings.ignoreWords}
+          onChange={(words) => save({ ignoreWords: words })}
+        />
+      </div>
+
+      <div className="section">
         <h2>Timing</h2>
         <label htmlFor="debounce">
           Debounce (ms after you stop typing before checking)
@@ -218,5 +266,65 @@ function FeatureToggle(props: {
         onChange={(e) => props.onChange(e.target.checked)}
       />
     </div>
+  );
+}
+
+function IgnoreWordsEditor(props: {
+  words: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [input, setInput] = useState("");
+
+  function add(): void {
+    const w = input.trim();
+    if (!w) return;
+    if (props.words.some((x) => x.toLowerCase() === w.toLowerCase())) {
+      setInput("");
+      return;
+    }
+    props.onChange([...props.words, w]);
+    setInput("");
+  }
+
+  function remove(idx: number): void {
+    const next = props.words.slice();
+    next.splice(idx, 1);
+    props.onChange(next);
+  }
+
+  return (
+    <>
+      <div className="row">
+        <input
+          type="text"
+          value={input}
+          placeholder="e.g. kmboards, ChoirMind, Mariz"
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+        />
+        <button onClick={add} disabled={!input.trim()}>
+          Add
+        </button>
+      </div>
+      <div className="chips">
+        {props.words.length === 0 ? (
+          <span className="chip empty">No ignored words yet.</span>
+        ) : (
+          props.words.map((w, i) => (
+            <span className="chip" key={`${w}-${i}`}>
+              {w}
+              <button onClick={() => remove(i)} aria-label={`Remove ${w}`}>
+                ×
+              </button>
+            </span>
+          ))
+        )}
+      </div>
+    </>
   );
 }

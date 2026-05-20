@@ -32,7 +32,53 @@ async function getSettings(): Promise<ExtensionSettings> {
     ...DEFAULT_SETTINGS,
     ...(s ?? {}),
     features: { ...DEFAULT_SETTINGS.features, ...(s?.features ?? {}) },
+    ignoreWords: Array.isArray(s?.ignoreWords) ? s.ignoreWords : [],
   };
+}
+
+function buildSystemPrompt(
+  base: string,
+  settings: ExtensionSettings,
+  kind: "suggest" | "rewrite" | "reply",
+): string {
+  let prompt = base;
+  const ci = settings.customInstructions.trim();
+  const vs = settings.voiceSamples.trim();
+
+  if (kind === "rewrite" || kind === "reply") {
+    if (vs) {
+      prompt += `\n\nThe user's writing voice. Match their tone, vocabulary, sentence rhythm, and level of formality:\n"""\n${vs}\n"""`;
+    }
+  }
+
+  if (ci) {
+    prompt += `\n\nUser's additional preferences (apply these to your output):\n${ci}`;
+  }
+
+  if (kind === "suggest" && settings.ignoreWords.length > 0) {
+    const list = settings.ignoreWords
+      .map((w) => w.trim())
+      .filter(Boolean)
+      .join(", ");
+    if (list) {
+      prompt += `\n\nNever flag these words as misspellings or errors (they are intentional and personal to the user): ${list}`;
+    }
+  }
+
+  return prompt;
+}
+
+function filterIgnored(
+  suggestions: Suggestion[],
+  ignoreWords: string[],
+): Suggestion[] {
+  if (ignoreWords.length === 0) return suggestions;
+  const ignore = new Set(
+    ignoreWords.map((w) => w.trim().toLowerCase()).filter(Boolean),
+  );
+  return suggestions.filter(
+    (s) => !ignore.has(s.original.trim().toLowerCase()),
+  );
 }
 
 async function setSettings(patch: Partial<ExtensionSettings>): Promise<void> {
@@ -119,7 +165,7 @@ async function handleCheck(
   const res = await callAnthropic({
     apiKey: settings.apiKey,
     model: (model ?? settings.model) as ExtensionSettings["model"],
-    system: SUGGEST_SYSTEM_PROMPT,
+    system: buildSystemPrompt(SUGGEST_SYSTEM_PROMPT, settings, "suggest"),
     cacheSystem: true,
     messages: [{ role: "user", content: userMsg }],
     tool: SUGGEST_TOOL,
@@ -130,6 +176,7 @@ async function handleCheck(
     res,
     SUGGEST_TOOL.name,
   );
+  out.suggestions = filterIgnored(out.suggestions, settings.ignoreWords);
   return { ok: true, data: out };
 }
 
@@ -146,7 +193,7 @@ async function handleRewrite(
   const res = await callAnthropic({
     apiKey: settings.apiKey,
     model: (model ?? settings.model) as ExtensionSettings["model"],
-    system: REWRITE_SYSTEM_PROMPT,
+    system: buildSystemPrompt(REWRITE_SYSTEM_PROMPT, settings, "rewrite"),
     cacheSystem: true,
     messages: [{ role: "user", content: userMsg }],
     tool: REWRITE_TOOL,
@@ -171,7 +218,7 @@ async function handleReplyDrafts(
   const res = await callAnthropic({
     apiKey: settings.apiKey,
     model: (model ?? settings.model) as ExtensionSettings["model"],
-    system: REPLY_SYSTEM_PROMPT,
+    system: buildSystemPrompt(REPLY_SYSTEM_PROMPT, settings, "reply"),
     cacheSystem: true,
     messages: [{ role: "user", content: userMsg }],
     tool: REPLY_TOOL,
@@ -180,6 +227,22 @@ async function handleReplyDrafts(
   await recordUsage(res.usage);
   const out = extractToolInput<{ drafts: ReplyDraft[] }>(res, REPLY_TOOL.name);
   return { ok: true, data: out };
+}
+
+async function handleIgnoreWord(
+  word: string,
+): Promise<BackgroundResponse<{ ignoreWords: string[] }>> {
+  const w = word.trim();
+  if (!w) return { ok: false, error: "Empty word" };
+  const settings = await getSettings();
+  const lower = w.toLowerCase();
+  const exists = settings.ignoreWords.some((x) => x.toLowerCase() === lower);
+  if (!exists) {
+    const next = [...settings.ignoreWords, w];
+    await setSettings({ ignoreWords: next });
+    return { ok: true, data: { ignoreWords: next } };
+  }
+  return { ok: true, data: { ignoreWords: settings.ignoreWords } };
 }
 
 chrome.runtime.onMessage.addListener(
@@ -217,6 +280,9 @@ chrome.runtime.onMessage.addListener(
           case "set_settings":
             await setSettings(msg.settings);
             sendResponse({ ok: true, data: await getSettings() });
+            break;
+          case "ignore_word":
+            sendResponse(await handleIgnoreWord(msg.word));
             break;
           default: {
             const _exhaustive: never = msg;
