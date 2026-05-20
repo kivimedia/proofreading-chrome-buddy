@@ -1,4 +1,5 @@
 import { ComposeInstance } from "./compose-instance";
+import { ensureRewriteController } from "./rewrite-controller";
 
 const EDITOR_SELECTOR =
   '[contenteditable="true"][aria-label*="Message Body"], [contenteditable="true"][g_editable="true"]';
@@ -29,6 +30,7 @@ function reapDetached(): void {
 }
 
 function start(): void {
+  ensureRewriteController();
   scan(document);
   const obs = new MutationObserver((records) => {
     for (const r of records) {

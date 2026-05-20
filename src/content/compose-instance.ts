@@ -1,6 +1,7 @@
 import { OverlayRenderer, type OverlayItem } from "./overlay-renderer";
 import { diffParagraphs, snapshotEditor } from "./paragraph-differ";
 import { findRangeInBlock } from "./range-finder";
+import { findReplyConversation, ReplyAssist } from "./reply-assist";
 import type {
   BackgroundMessage,
   BackgroundResponse,
@@ -31,6 +32,7 @@ export class ComposeInstance {
   private prevParagraphs: Paragraph[] = [];
   private settings: ExtensionSettings | null = null;
   private destroyed = false;
+  private replyAssist: ReplyAssist | null = null;
 
   private readonly inputHandler: () => void;
   private readonly viewportHandler: () => void;
@@ -61,6 +63,10 @@ export class ComposeInstance {
     if (this.destroyed) return;
     if (res.ok && res.data) {
       this.settings = res.data;
+      if (this.settings.features.replyDrafts) {
+        const conv = findReplyConversation(this.editor);
+        if (conv) this.replyAssist = new ReplyAssist(this.editor, conv);
+      }
       this.scheduleCheck();
     }
   }
@@ -231,6 +237,8 @@ export class ComposeInstance {
     window.removeEventListener("resize", this.viewportHandler);
     this.resizeObserver.disconnect();
     this.overlay.destroy();
+    this.replyAssist?.destroy();
+    this.replyAssist = null;
   }
 }
 
