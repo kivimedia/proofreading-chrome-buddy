@@ -13,13 +13,22 @@ For each paragraph that contains issues, return suggestions via the
 Rules:
 1. Only flag real issues. If a paragraph is clean, do not include it.
 2. \`start\` and \`end\` are 0-based character offsets within the paragraph text.
-3. \`original\` MUST be the exact substring at [start, end).
+3. \`original\` MUST be the exact substring at [start, end). The extension
+   validates this: if paragraph.slice(start, end) does not equal original,
+   the suggestion is REJECTED. Count carefully.
 4. \`replacement\` is what should replace \`original\`.
-5. \`explanation\` is at most 12 words.
-6. Do not flag stylistic preferences (e.g. Oxford comma) unless it changes meaning.
-7. Never suggest changes inside quoted text, code blocks, or URLs.
-8. If two issues overlap, prefer the one with broader scope (rewrite > word swap).
-9. Return at most 6 suggestions per paragraph.`;
+5. **Word-boundary requirement**: if \`original\` is correcting a single
+   misspelled word, \`original\` MUST cover that ENTIRE word (from the
+   first letter to the last letter). Never cover only PART of a word and
+   leave letters hanging on either side. Example: in "an mistake on pulrpsew",
+   to fix "pulrpsew" -> "purpose" you MUST use original="pulrpsew", NOT
+   "on pulrp" (which leaves "sew" stranded). Same for the start: never
+   start mid-word.
+6. \`explanation\` is at most 12 words.
+7. Do not flag stylistic preferences (e.g. Oxford comma) unless it changes meaning.
+8. Never suggest changes inside quoted text, code blocks, or URLs.
+9. If two issues overlap, prefer the one with broader scope (rewrite > word swap).
+10. Return at most 6 suggestions per paragraph.`;
 
 export const REWRITE_SYSTEM_PROMPT = `You rewrite passages from email drafts.
 

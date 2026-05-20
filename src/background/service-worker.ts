@@ -81,6 +81,87 @@ function filterIgnored(
   );
 }
 
+// Reconcile model-returned suggestions against the actual paragraph text.
+// Claude is mostly accurate at character offsets but slips, especially on
+// long paragraphs or when correcting words near the end. Failure mode we've
+// seen: model returns start/end that cover "on pulrp" when it meant to
+// cover "pulrpsew" + replacement "purpose", producing partial-word output
+// like "purposesew". This validator:
+//   1. Drops suggestions whose paragraph_index is unknown.
+//   2. If text.slice(start, end) does not equal original, searches the
+//      paragraph for original near the claimed start and patches the offsets.
+//   3. Drops suggestions whose final start/end land mid-word (a letter
+//      immediately before start, or immediately after end), because applying
+//      them would leave word fragments dangling.
+function reconcileSuggestions(
+  paragraphs: Paragraph[],
+  suggestions: Suggestion[],
+): Suggestion[] {
+  const byIndex = new Map(paragraphs.map((p) => [p.index, p.text]));
+  const out: Suggestion[] = [];
+  for (const s of suggestions) {
+    const text = byIndex.get(s.paragraph_index);
+    if (text === undefined) continue;
+    if (typeof s.original !== "string" || s.original.length === 0) continue;
+
+    let { start, end } = s;
+    if (text.slice(start, end) !== s.original) {
+      const hint = typeof start === "number" ? start : 0;
+      const located = findClosestOccurrence(text, s.original, hint);
+      if (located === -1) {
+        console.warn(
+          "[proofreading-chrome-buddy] dropping suggestion: original not found in paragraph",
+          { paragraph_index: s.paragraph_index, original: s.original },
+        );
+        continue;
+      }
+      start = located;
+      end = located + s.original.length;
+    }
+
+    if (straddlesWordBoundary(text, start, end)) {
+      console.warn(
+        "[proofreading-chrome-buddy] dropping suggestion: range cuts a word",
+        { paragraph_index: s.paragraph_index, original: s.original, start, end },
+      );
+      continue;
+    }
+
+    out.push({ ...s, start, end });
+  }
+  return out;
+}
+
+function findClosestOccurrence(
+  text: string,
+  needle: string,
+  hint: number,
+): number {
+  let best = -1;
+  let bestDist = Infinity;
+  let idx = text.indexOf(needle);
+  while (idx !== -1) {
+    const dist = Math.abs(idx - hint);
+    if (dist < bestDist) {
+      best = idx;
+      bestDist = dist;
+    }
+    idx = text.indexOf(needle, idx + 1);
+  }
+  return best;
+}
+
+// Returns true if [start, end) cuts through a word: i.e. the character
+// immediately before start is a word char AND start itself is a word char,
+// or the same for end. Word char = letter (unicode) or digit.
+function straddlesWordBoundary(text: string, start: number, end: number): boolean {
+  const isWord = (c: string | undefined) =>
+    c !== undefined && /[\p{L}\p{N}]/u.test(c);
+  if (start > 0 && isWord(text[start - 1]) && isWord(text[start])) return true;
+  if (end < text.length && isWord(text[end - 1]) && isWord(text[end])) return true;
+  return false;
+}
+
 async function setSettings(patch: Partial<ExtensionSettings>): Promise<void> {
   const current = await getSettings();
   const next: ExtensionSettings = {
@@ -176,6 +257,7 @@ async function handleCheck(
     res,
     SUGGEST_TOOL.name,
   );
+  out.suggestions = reconcileSuggestions(paragraphs, out.suggestions);
   out.suggestions = filterIgnored(out.suggestions, settings.ignoreWords);
   return { ok: true, data: out };
 }
