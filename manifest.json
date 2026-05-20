@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Gmail Claude Assistant",
+  "version": "0.1.0",
+  "description": "Grammarly-like writing assistant for Gmail, powered by Claude (BYOK).",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://api.anthropic.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["src/content/gmail-compose-detector.ts"],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_origin_as_fallback": true
+    }
+  ],
+  "options_ui": {
+    "page": "src/options/index.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_title": "Gmail Claude Assistant",
+    "default_icon": {
+      "16": "public/icons/icon-16.png",
+      "48": "public/icons/icon-48.png",
+      "128": "public/icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "public/icons/icon-16.png",
+    "48": "public/icons/icon-48.png",
+    "128": "public/icons/icon-128.png"
+  }
+}

@@ -1,0 +1,56 @@
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  width: 320px;
+  background: #f7f8fa;
+  color: #1a1f36;
+}
+
+.wrap { padding: 16px; }
+
+h1 { font-size: 14px; font-weight: 600; margin: 0 0 12px; }
+
+.status-pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.status-pill.ok { background: #e6f7ed; color: #0e6839; }
+.status-pill.warn { background: #fef6e0; color: #7a5d10; }
+.status-pill.err { background: #fdecec; color: #a82424; }
+
+.card {
+  background: #fff;
+  border: 1px solid #e3e8ee;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.card .label { color: #4f566b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.card .value { font-size: 16px; font-weight: 600; }
+.card .sub { color: #697386; font-size: 11px; margin-top: 4px; }
+
+.cost { font-variant-numeric: tabular-nums; }
+
+.btn {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: #5b6ef5;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+  text-decoration: none;
+}
+.btn:hover { background: #4554c8; }
+.btn.secondary { background: #e3e8ee; color: #1a1f36; }
+.btn.secondary:hover { background: #cbd2dc; }
+
+.muted { color: #697386; font-size: 11px; margin-top: 8px; }
