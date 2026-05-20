@@ -19,9 +19,14 @@ export function snapshotEditor(editor: HTMLElement): EditorSnapshot {
   return { paragraphs, paragraphNodes: blocks };
 }
 
+// Skip quoted history (replies/forwards) and the user's own signature -
+// the user doesn't want grammar/spelling flags on either.
+const EXCLUDE_SELECTOR = ".gmail_quote, blockquote, .gmail_signature";
+
 function collectBlocks(editor: HTMLElement): HTMLElement[] {
   const direct = Array.from(editor.children).filter(
-    (c): c is HTMLElement => c instanceof HTMLElement,
+    (c): c is HTMLElement =>
+      c instanceof HTMLElement && !c.matches(EXCLUDE_SELECTOR),
   );
   if (direct.length === 0) return [editor];
   return direct;

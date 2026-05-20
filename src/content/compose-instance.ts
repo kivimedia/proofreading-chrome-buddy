@@ -24,6 +24,10 @@ export class ComposeInstance {
   // snapshot to look up by hash, so stale offsets (text edited since check)
   // are filtered out automatically.
   private suggestionsByHash = new Map<string, Suggestion[]>();
+  // Suggestion keys the user has dismissed (or accepted). Survives across
+  // check cycles in this composing session.
+  private dismissed = new Set<string>();
+
   private prevParagraphs: Paragraph[] = [];
   private settings: ExtensionSettings | null = null;
   private destroyed = false;
@@ -34,7 +38,10 @@ export class ComposeInstance {
 
   constructor(editor: HTMLElement) {
     this.editor = editor;
-    this.overlay = new OverlayRenderer();
+    this.overlay = new OverlayRenderer({
+      onAccept: (item) => this.handleAccept(item),
+      onDismiss: (item) => this.handleDismiss(item),
+    });
 
     this.inputHandler = () => this.scheduleCheck();
     this.viewportHandler = () => this.scheduleRepaint();
@@ -54,7 +61,6 @@ export class ComposeInstance {
     if (this.destroyed) return;
     if (res.ok && res.data) {
       this.settings = res.data;
-      // Initial check if there's already text in the draft.
       this.scheduleCheck();
     }
   }
@@ -156,11 +162,62 @@ export class ComposeInstance {
       const sugs = this.suggestionsByHash.get(para.hash);
       if (!sugs?.length) continue;
       for (const s of sugs) {
+        const key = suggestionKey(para.hash, s);
+        if (this.dismissed.has(key)) continue;
         const range = findRangeInBlock(block, s.start, s.end);
-        if (range) items.push({ suggestion: s, range });
+        if (range) items.push({ suggestion: s, range, key });
       }
     }
     this.overlay.setItems(items);
+  }
+
+  private handleAccept(item: OverlayItem): void {
+    if (this.destroyed) return;
+    if (!this.editor.isConnected) return;
+    // Build a fresh Range against the live DOM (item.range may be stale if
+    // the editor rerendered since draw).
+    const liveRange = this.findFreshRange(item);
+    if (!liveRange) return;
+
+    this.editor.focus();
+    const sel = window.getSelection();
+    if (!sel) return;
+    sel.removeAllRanges();
+    sel.addRange(liveRange);
+
+    // execCommand preserves Gmail's native undo stack (Ctrl-Z reverts the
+    // accepted suggestion as one step).
+    const ok = document.execCommand("insertText", false, item.suggestion.replacement);
+    if (!ok) {
+      // Fallback: write directly. Loses undo step but at least applies the fix.
+      liveRange.deleteContents();
+      liveRange.insertNode(document.createTextNode(item.suggestion.replacement));
+    }
+
+    // Mark as dismissed so it doesn't re-render between now and the next check.
+    this.dismissed.add(item.key);
+    // The input event fires from execCommand and will reschedule a check.
+    this.repaint();
+  }
+
+  private handleDismiss(item: OverlayItem): void {
+    if (this.destroyed) return;
+    this.dismissed.add(item.key);
+    this.repaint();
+  }
+
+  // Re-derive the Range against the current DOM using the same paragraph hash
+  // and char offsets. Protects against the stored Range being invalidated by
+  // any DOM rerender since draw.
+  private findFreshRange(item: OverlayItem): Range | null {
+    const snap = snapshotEditor(this.editor);
+    for (let i = 0; i < snap.paragraphs.length; i++) {
+      const para = snap.paragraphs[i];
+      if (suggestionKey(para.hash, item.suggestion) !== item.key) continue;
+      const block = snap.paragraphNodes[i];
+      return findRangeInBlock(block, item.suggestion.start, item.suggestion.end);
+    }
+    return null;
   }
 
   destroy(): void {
@@ -175,6 +232,10 @@ export class ComposeInstance {
     this.resizeObserver.disconnect();
     this.overlay.destroy();
   }
+}
+
+function suggestionKey(paraHash: string, s: Suggestion): string {
+  return `${paraHash}:${s.paragraph_index}:${s.start}:${s.end}:${s.replacement}`;
 }
 
 function sendBg<T = unknown>(
