@@ -180,11 +180,17 @@ export class OverlayRenderer {
   setItems(items: OverlayItem[]): void {
     this.items = items;
     this.draw();
-    if (
-      this.hoveredItem &&
-      !items.some((i) => i.key === this.hoveredItem!.key)
-    ) {
-      this.hidePopover();
+    // If a popover is open, find the new item with the matching key and
+    // update this.hoveredItem so the virtual anchor reads the FRESH Range
+    // (compute-instance regenerates Ranges on every repaint). If no item
+    // matches anymore, hide.
+    if (this.hoveredItem) {
+      const fresh = items.find((i) => i.key === this.hoveredItem!.key);
+      if (fresh) {
+        this.hoveredItem = fresh;
+      } else {
+        this.hidePopover();
+      }
     }
   }
 
@@ -216,9 +222,13 @@ export class OverlayRenderer {
         hit.style.top = `${rect.top}px`;
         hit.style.width = `${rect.width}px`;
         hit.style.height = `${rect.height + 4}px`;
-        hit.addEventListener("mouseenter", () =>
-          this.showPopoverFor(item, hit),
-        );
+        hit.addEventListener("mouseenter", () => {
+          console.debug(
+            "[proofreading-chrome-buddy] hit hover:",
+            item.suggestion.original,
+          );
+          this.showPopoverFor(item, hit);
+        });
         hit.addEventListener("mouseleave", () => this.scheduleHide());
         hit.addEventListener("click", () => this.showPopoverFor(item, hit));
         this.hitLayer.appendChild(hit);
@@ -226,7 +236,14 @@ export class OverlayRenderer {
     }
   }
 
-  private showPopoverFor(item: OverlayItem, anchor: HTMLDivElement): void {
+  private showPopoverFor(item: OverlayItem, anchorHit: HTMLDivElement): void {
+    void anchorHit; // listened via mouseenter/click; anchor uses Range directly
+    console.debug(
+      "[proofreading-chrome-buddy] popover show:",
+      item.suggestion.original,
+      "->",
+      item.suggestion.replacement,
+    );
     this.cancelHide();
     const switching = this.hoveredItem?.key !== item.key;
     this.hoveredItem = item;
@@ -237,14 +254,38 @@ export class OverlayRenderer {
       this.popoverCleanup();
       this.popoverCleanup = null;
     }
-    this.popoverCleanup = autoUpdate(anchor, this.popoverEl, () => {
-      void computePosition(anchor, this.popoverEl, {
-        placement: "bottom-start",
-        middleware: [offset(6), flip(), shift({ padding: 8 })],
-      }).then(({ x, y }) => {
-        this.popoverEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
-      });
-    });
+
+    // Virtual anchor: reads the live Range bbox each time @floating-ui
+    // probes it. Survives repaints that replace the hit div, and tracks
+    // text reflow without us re-registering.
+    const virtualAnchor = {
+      getBoundingClientRect: () => {
+        const rect = item.range.getBoundingClientRect();
+        // If the range collapsed (e.g. text edited out), getBoundingClientRect
+        // returns a 0-size rect at 0,0. Detect and hide.
+        if (rect.width === 0 && rect.height === 0) {
+          queueMicrotask(() => this.hidePopover());
+        }
+        return rect;
+      },
+    };
+
+    this.popoverCleanup = autoUpdate(
+      virtualAnchor as unknown as Element,
+      this.popoverEl,
+      () => {
+        void computePosition(
+          virtualAnchor as unknown as Element,
+          this.popoverEl,
+          {
+            placement: "bottom-start",
+            middleware: [offset(6), flip(), shift({ padding: 8 })],
+          },
+        ).then(({ x, y }) => {
+          this.popoverEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+        });
+      },
+    );
   }
 
   private populatePopover(item: OverlayItem): void {

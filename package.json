@@ -1,6 +1,6 @@
 {
   "name": "proofreading-chrome-buddy",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Grammarly-like Chrome extension for Gmail + Facebook, powered by Claude (BYOK)",
   "private": true,
   "type": "module",

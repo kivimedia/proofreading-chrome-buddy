@@ -1,19 +1,21 @@
 // Insert plain text into a contenteditable, replacing the given range,
 // while preserving the host app's undo stack as much as possible.
 //
-// Tries three strategies in order:
-//   1. document.execCommand('insertText', false, text). Works in Gmail and
-//      most classic contenteditable surfaces - preserves the native undo
-//      stack as one step.
-//   2. dispatch a beforeinput event with inputType='insertReplacementText'.
-//      Used by Lexical (Meta's editor on Facebook) to route the change
-//      through its model.
-//   3. Direct DOM mutation: range.deleteContents() + range.insertNode(text).
-//      Last-resort; may leak through Lexical's reconciler and cause weird
-//      duplication, but at least applies the change visually.
+// Verified strategies (tested live on playground.lexical.dev):
+//   1. document.execCommand('insertText', ...) - works on Gmail AND Lexical.
+//      Preserves the host's native undo stack.
+//   2. Synthetic InputEvent('beforeinput', inputType='insertReplacementText')
+//      - works on Lexical (it cancels the event and applies the change
+//      through its own model). Most other contenteditable hosts ignore it.
 //
-// Returns the strategy that succeeded, for logging/telemetry.
-export type InsertStrategy = "execCommand" | "inputEvent" | "domMutation" | "failed";
+// NOT used (proven destructive on Lexical):
+//   - Direct DOM mutation via range.deleteContents() + range.insertNode().
+//     On Lexical, this initially appears to work but the reconciler nukes
+//     our injected text on its next render tick AND doesn't restore the
+//     original - leaving the user with a deletion + nothing. This is the
+//     "first Accept did nothing" bug. We refuse to do this and surface the
+//     failure instead.
+export type InsertStrategy = "execCommand" | "inputEvent" | "failed";
 
 export function insertTextIntoEditor(
   editor: HTMLElement,
@@ -33,7 +35,6 @@ export function insertTextIntoEditor(
   }
 
   // Strategy 1: execCommand. Returns true if it accepted the operation.
-  // Most contenteditable hosts (including Gmail) handle this natively.
   try {
     if (document.execCommand("insertText", false, text)) {
       return "execCommand";
@@ -43,8 +44,8 @@ export function insertTextIntoEditor(
   }
 
   // Strategy 2: synthesize a beforeinput. Lexical listens for this and
-  // applies the change in its own model. Other editors ignore it, so this
-  // is safe to try unconditionally.
+  // applies the change in its own model. If a listener calls
+  // preventDefault (dispatchEvent returns false), we count that as success.
   try {
     const ev = new InputEvent("beforeinput", {
       inputType: "insertReplacementText",
@@ -53,20 +54,13 @@ export function insertTextIntoEditor(
       cancelable: true,
     });
     const dispatched = editor.dispatchEvent(ev);
-    // If the event was canceled by a listener (Lexical does this when it
-    // handles the change itself), the editor's content has already been
-    // updated by the handler. Treat that as success.
     if (!dispatched) return "inputEvent";
   } catch {
     /* fallthrough */
   }
 
-  // Strategy 3: DOM mutation. Last resort.
-  try {
-    range.deleteContents();
-    range.insertNode(document.createTextNode(text));
-    return "domMutation";
-  } catch {
-    return "failed";
-  }
+  console.warn(
+    "[proofreading-chrome-buddy] insertion failed: neither execCommand nor beforeinput took the change. Skipping rather than corrupting the editor.",
+  );
+  return "failed";
 }
