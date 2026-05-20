@@ -117,6 +117,11 @@ export class ComposeInstance {
       return;
     }
 
+    console.debug(
+      "[proofreading-chrome-buddy] check dispatch:",
+      changed.map((p) => `[${p.index}] ${JSON.stringify(p.text)}`).join(" | "),
+    );
+
     this.inFlight = true;
     try {
       const res = await sendBg<{ suggestions: Suggestion[] }>({
@@ -126,6 +131,12 @@ export class ComposeInstance {
       });
       if (this.destroyed) return;
       if (res.ok && res.data) {
+        console.debug(
+          "[proofreading-chrome-buddy] check response:",
+          res.data.suggestions.length,
+          "suggestion(s):",
+          res.data.suggestions,
+        );
         const byParaIndex = new Map<number, Suggestion[]>();
         for (const s of res.data.suggestions) {
           const arr = byParaIndex.get(s.paragraph_index) ?? [];
@@ -137,10 +148,10 @@ export class ComposeInstance {
         }
         this.pruneCache();
       } else if (!res.ok) {
-        console.warn("[gmail-claude-assistant] check failed:", res.error);
+        console.warn("[proofreading-chrome-buddy] check failed:", res.error);
       }
     } catch (err) {
-      console.warn("[gmail-claude-assistant] check threw:", err);
+      console.warn("[proofreading-chrome-buddy] check threw:", err);
     } finally {
       this.inFlight = false;
       this.prevParagraphs = snap.paragraphs;

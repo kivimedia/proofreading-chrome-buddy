@@ -2,37 +2,67 @@ import { ComposeInstance } from "./compose-instance";
 import { FACEBOOK_CONFIG } from "./paragraph-differ";
 import { ensureRewriteController } from "./rewrite-controller";
 
-// Facebook's main composer (feed posts, comments, marketplace descriptions,
-// group posts) is always rendered as a contenteditable with role=textbox
-// using Meta's Lexical editor. Search boxes, chat header inputs, and a few
-// other things ALSO match that selector, so we filter by aria-label.
-const FB_SELECTOR = '[contenteditable="true"][role="textbox"]';
+// Match any contenteditable with role=textbox. We accept both "true" and
+// "plaintext-only" because Lexical (Meta's editor) can use either.
+const FB_SELECTOR = '[contenteditable][role="textbox"]';
 
-// Include if the aria-label looks like a composer.
-const INCLUDE_RE = /post|comment|mind|message|reply|describe|write|share/i;
-// Exclude if it's a search box, name field, etc.
-const EXCLUDE_RE = /search|find|name|emoji|filter/i;
+// Hard exclusions only - default is INCLUDE. Hebrew/RTL aria-labels won't
+// match English allow-lists, so any keyword-based include-list is too
+// brittle. We block search/chat metadata fields (case-insensitive,
+// English + Hebrew) and let everything else through.
+const EXCLUDE_KEYWORDS = [
+  "search",
+  "filter",
+  "emoji",
+  "find friend",
+  "first name",
+  "last name",
+  "your name",
+  "phone",
+  "password",
+  "email",
+  "username",
+  "url",
+  "חיפוש", // Hebrew: search
+  "סנן", // Hebrew: filter
+];
 
-const MIN_HEIGHT_PX = 24;
+const MIN_HEIGHT_PX = 18;
 
 const instances = new Map<HTMLElement, ComposeInstance>();
 
 function isLikelyComposer(editor: HTMLElement): boolean {
-  const label = editor.getAttribute("aria-label") ?? "";
-  if (label) {
-    if (EXCLUDE_RE.test(label)) return false;
-    if (INCLUDE_RE.test(label)) return true;
+  const label = (editor.getAttribute("aria-label") ?? "").toLowerCase();
+  for (const kw of EXCLUDE_KEYWORDS) {
+    if (label.includes(kw.toLowerCase())) {
+      console.debug(
+        "[proofreading-chrome-buddy] FB skip (excluded label):",
+        label,
+      );
+      return false;
+    }
   }
-  // No label or unrecognized: accept if it's big enough to plausibly be a
-  // post composer rather than a one-line chat / search input.
   const rect = editor.getBoundingClientRect();
-  return rect.height >= MIN_HEIGHT_PX;
+  if (rect.height > 0 && rect.height < MIN_HEIGHT_PX) {
+    console.debug(
+      "[proofreading-chrome-buddy] FB skip (too short):",
+      rect.height,
+      "label:",
+      label,
+    );
+    return false;
+  }
+  return true;
 }
 
 function attach(editor: HTMLElement): void {
   if (instances.has(editor)) return;
   if (!editor.isConnected) return;
   if (!isLikelyComposer(editor)) return;
+  console.debug(
+    "[proofreading-chrome-buddy] FB composer attached:",
+    editor.getAttribute("aria-label") || "(no aria-label)",
+  );
   instances.set(editor, new ComposeInstance(editor, FACEBOOK_CONFIG));
 }
 
