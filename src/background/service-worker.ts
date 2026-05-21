@@ -357,7 +357,69 @@ chrome.runtime.onMessage.addListener(
   },
 );
 
+/**
+ * Compile-time seed for voiceProfile + customInstructions + ignoreWords. Read
+ * by vite.config.ts from $HOME/private/proofreading-buddy-bootstrap.json at
+ * build time. The actual file is NEVER tracked - if no file exists at build,
+ * the value is `null` and the bootstrap path is a no-op. Even if a future
+ * build has a seed, the writer below only fires when the user's current
+ * voiceProfile is empty - it never overwrites edits. (Type lives in
+ * src/globals.d.ts.)
+ */
+async function maybeBootstrapVoice(): Promise<void> {
+  // typeof check makes the dead-code-elimination path obvious when the
+  // define is `null` at build time.
+  const seed = typeof __BOOTSTRAP_VOICE__ !== "undefined" ? __BOOTSTRAP_VOICE__ : null;
+  if (!seed) return;
+  const current = await getSettings();
+  if ((current.voiceProfile ?? "").trim().length > 0) return; // user already has one
+  const merged: Partial<ExtensionSettings> = {};
+  if (typeof seed.voiceProfile === "string" && seed.voiceProfile.trim()) {
+    merged.voiceProfile = seed.voiceProfile;
+  }
+  // Only seed customInstructions if empty - never overwrite a user edit.
+  if (
+    typeof seed.customInstructions === "string" &&
+    seed.customInstructions.trim() &&
+    !(current.customInstructions ?? "").trim()
+  ) {
+    merged.customInstructions = seed.customInstructions;
+  }
+  // Ignore words: union, dedupe (case-insensitive).
+  if (Array.isArray(seed.ignoreWords) && seed.ignoreWords.length > 0) {
+    const have = new Set(current.ignoreWords.map((w) => w.toLowerCase()));
+    const additions = seed.ignoreWords.filter(
+      (w) => typeof w === "string" && w.trim() && !have.has(w.toLowerCase()),
+    );
+    if (additions.length > 0) {
+      merged.ignoreWords = [...current.ignoreWords, ...additions];
+    }
+  }
+  if (Object.keys(merged).length === 0) return;
+  await setSettings(merged);
+  console.log(
+    "[proofreading-chrome-buddy] voice bootstrap loaded into chrome.storage.local " +
+      `(voiceProfile=${(merged.voiceProfile ?? "").length} chars, ` +
+      `customInstructions=${(merged.customInstructions ?? "").length} chars, ` +
+      `ignoreWords += ${(merged.ignoreWords ?? []).length - current.ignoreWords.length})`,
+  );
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   const current = await getSettings();
   await setSettings(current); // normalizes shape on upgrade
+  await maybeBootstrapVoice();
 });
+
+// Service-worker cold-start (after MV3 idle eviction). Fires on Chrome browser
+// startup AND - for unpacked extensions - after a manual reload. Belt and
+// braces with onInstalled so the bootstrap always runs at least once after
+// a fresh build, regardless of which event fires first.
+chrome.runtime.onStartup.addListener(async () => {
+  await maybeBootstrapVoice();
+});
+
+// Also run at module load time so the very first service-worker invocation
+// (which fires before onInstalled in some edge cases) still seeds. The check
+// inside maybeBootstrapVoice makes repeat invocations safe.
+void maybeBootstrapVoice();
