@@ -1,10 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  buildSystemPrompt,
+  type Surface,
+} from "@/shared/build-system-prompt";
+import {
+  REPLY_SYSTEM_PROMPT,
+  REWRITE_SYSTEM_PROMPT,
+  SUGGEST_SYSTEM_PROMPT,
+} from "@/shared/prompts";
 import type {
   BackgroundMessage,
   BackgroundResponse,
   ExtensionSettings,
   ModelId,
 } from "@/shared/types";
+
+const BASE_PROMPTS: Record<Surface, string> = {
+  suggest: SUGGEST_SYSTEM_PROMPT,
+  rewrite: REWRITE_SYSTEM_PROMPT,
+  reply: REPLY_SYSTEM_PROMPT,
+};
+
+const SURFACE_LABEL: Record<Surface, string> = {
+  suggest: "Suggest (wavy underlines)",
+  rewrite: "Rewrite (selection rewrites)",
+  reply: "Reply drafts",
+};
 
 type Status =
   | { kind: "idle" }
@@ -284,23 +305,27 @@ export function App() {
         <input
           id="grade"
           type="number"
-          min={4}
+          min={2}
           max={14}
           step={1}
           value={settings.targetGrade}
           onChange={(e) => {
             const n = Number(e.target.value);
             if (Number.isFinite(n)) {
-              save({ targetGrade: Math.max(4, Math.min(14, Math.round(n))) });
+              save({ targetGrade: Math.max(2, Math.min(14, Math.round(n))) });
             }
           }}
           style={{ width: 80 }}
         />
         <p className="help">
           Claude will target this reading level on every suggestion + rewrite.
-          4 = elementary, 8 = the Hemingway-app default, 14 = college. You can
-          also adjust this from the popup slider.
+          2 = early reader, 8 = the Hemingway-app default, 14 = college. You
+          can also adjust this from the popup slider.
         </p>
+      </div>
+
+      <div className="section">
+        <RulesInEffect settings={settings} />
       </div>
 
       <div className="section">
@@ -421,6 +446,109 @@ function IgnoreWordsEditor(props: {
           ))
         )}
       </div>
+    </>
+  );
+}
+
+/**
+ * "Rules in effect" preview - shows the EXACT composed system prompt that
+ * will be sent to Claude for each of the 3 surfaces (suggest / rewrite /
+ * reply), based on the current settings. Uses the same buildSystemPrompt()
+ * from @/shared so there is no second source of truth + the preview cannot
+ * drift from what the background actually sends.
+ */
+function RulesInEffect(props: { settings: ExtensionSettings }) {
+  const [surface, setSurface] = useState<Surface>("suggest");
+
+  const composed = useMemo(
+    () => buildSystemPrompt(BASE_PROMPTS[surface], props.settings, surface),
+    [surface, props.settings],
+  );
+
+  // Diff: how many chars/lines did OUR settings add on top of the base?
+  const base = BASE_PROMPTS[surface];
+  const addedChars = composed.length - base.length;
+  const addedLines = composed.split("\n").length - base.split("\n").length;
+
+  return (
+    <>
+      <h2>Rules in effect</h2>
+      <p className="help">
+        This is exactly what Claude sees as the system prompt for each surface
+        on every call, given your current settings. Use this to verify your
+        voice profile, custom instructions, ignore-words list, and grade
+        target are wired in the way you expect. Read-only.
+      </p>
+      <div
+        role="tablist"
+        aria-label="System prompt by surface"
+        style={{ display: "flex", gap: 6, marginBottom: 8 }}
+      >
+        {(Object.keys(BASE_PROMPTS) as Surface[]).map((s) => {
+          const active = s === surface;
+          return (
+            <button
+              key={s}
+              role="tab"
+              aria-selected={active}
+              type="button"
+              onClick={() => setSurface(s)}
+              className={active ? "btn" : "btn ghost"}
+              style={{ flex: 1, fontSize: 12 }}
+            >
+              {SURFACE_LABEL[s]}
+            </button>
+          );
+        })}
+      </div>
+      <div
+        className="help"
+        style={{ marginBottom: 6, display: "flex", justifyContent: "space-between" }}
+      >
+        <span>
+          {composed.length.toLocaleString()} chars total
+          {addedChars > 0 && (
+            <>
+              {" "}({addedChars.toLocaleString()} added by your settings, +{addedLines} line
+              {addedLines === 1 ? "" : "s"})
+            </>
+          )}
+        </span>
+        <button
+          type="button"
+          className="btn ghost"
+          style={{ padding: "2px 8px", fontSize: 11 }}
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(composed);
+            } catch {
+              // Some browsers block clipboard in extension pages; ignore.
+            }
+          }}
+          title="Copy this exact prompt to the clipboard"
+        >
+          Copy
+        </button>
+      </div>
+      <textarea
+        readOnly
+        rows={20}
+        value={composed}
+        style={{
+          fontFamily:
+            "ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace",
+          fontSize: 12,
+          lineHeight: 1.45,
+        }}
+      />
+      <p className="help">
+        The base prompt for {SURFACE_LABEL[surface]} comes from
+        <code style={{ marginLeft: 4 }}>src/shared/prompts.ts</code>. Anything
+        below it in this preview was added because of your settings (voice
+        profile, grade target, custom instructions, voice samples, ignore
+        words). Edit those fields above and switch tabs - this preview
+        updates live.
+      </p>
     </>
   );
 }

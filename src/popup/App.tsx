@@ -17,7 +17,7 @@ const MODEL_PRICING_USD_PER_MTOK: Record<
   "claude-opus-4-7": { input: 15, output: 75, cache_read: 1.5 },
 };
 
-const MIN_GRADE = 4;
+const MIN_GRADE = 2;
 const MAX_GRADE = 14;
 
 export function App() {
@@ -67,10 +67,36 @@ export function App() {
   }
 
   async function onFixNow() {
+    // "Fix" = scan now + auto-apply everything in one click. Two-step under
+    // the hood: force a fresh check (skipping debounce), then accept-all
+    // whatever it surfaced. If the check turns up nothing, the accept-all is
+    // a no-op and we tell the user the draft is already clean.
     setBusy("fix");
     setStatus(null);
-    const res = await sendToTab({ kind: "fix_now" });
-    setStatus({ ok: res.ok, text: res.status ?? res.error ?? "Done." });
+    const checkRes = await sendToTab({ kind: "fix_now" });
+    if (!checkRes.ok) {
+      setStatus({ ok: false, text: checkRes.status ?? checkRes.error ?? "Failed." });
+      setBusy(null);
+      return;
+    }
+    if ((checkRes.count ?? 0) === 0) {
+      setStatus({ ok: true, text: "Draft is clean. No fixes needed." });
+      setBusy(null);
+      return;
+    }
+    const applyRes = await sendToTab({ kind: "accept_all" });
+    if (!applyRes.ok) {
+      setStatus({
+        ok: false,
+        text: `Scanned and found ${checkRes.count} issue${checkRes.count === 1 ? "" : "s"} but could not apply: ${applyRes.error ?? "unknown"}`,
+      });
+    } else {
+      const applied = applyRes.count ?? 0;
+      setStatus({
+        ok: true,
+        text: `Fixed ${applied} issue${applied === 1 ? "" : "s"} in your draft.`,
+      });
+    }
     setBusy(null);
   }
 
@@ -191,7 +217,7 @@ export function App() {
             marginTop: -2,
           }}
         >
-          <span>4 (elementary)</span>
+          <span>2 (early reader)</span>
           <span>8 (default)</span>
           <span>14 (college)</span>
         </div>
@@ -227,14 +253,28 @@ export function App() {
         </div>
       )}
 
-      <a
+      <button
+        type="button"
         className="btn"
-        href={chrome.runtime.getURL("src/options/index.html")}
-        target="_blank"
-        rel="noreferrer"
+        onClick={() => {
+          // MV3 canonical API for opening the options page. Honors the manifest
+          // `options_ui.open_in_tab` flag, focuses an already-open tab if one
+          // exists, and works correctly even when the popup is opened from
+          // chrome://extensions (where raw chrome-extension://... links can be
+          // blocked). Falls back to chrome.tabs.create for ancient Chrome
+          // versions that somehow lack openOptionsPage.
+          if (chrome.runtime.openOptionsPage) {
+            chrome.runtime.openOptionsPage();
+          } else {
+            void chrome.tabs.create({
+              url: chrome.runtime.getURL("src/options/index.html"),
+            });
+          }
+          window.close();
+        }}
       >
         Open settings
-      </a>
+      </button>
 
       <p className="muted">
         Model: {modelLabel(settings!.model)}. BYOK - your key never leaves this
