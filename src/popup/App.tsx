@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   BackgroundResponse,
   ExtensionSettings,
@@ -26,7 +26,11 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<"scan" | "fix" | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
-  const [gradeSaving, setGradeSaving] = useState(false);
+  // Debounce timer for persisting the grade slider. Each slider tick updates
+  // the LOCAL state immediately (slider stays smooth) but only flushes to
+  // chrome.storage.local ~250ms after the user stops dragging - so we don't
+  // race the response against subsequent ticks.
+  const gradeSaveTimer = useRef<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -110,17 +114,24 @@ export function App() {
     setBusy(null);
   }
 
-  async function onGradeChange(newGrade: number) {
+  function onGradeChange(newGrade: number) {
     if (!settings) return;
     const clamped = Math.max(MIN_GRADE, Math.min(MAX_GRADE, Math.round(newGrade)));
+    // 1. Local state updates IMMEDIATELY so the slider tracks the user with
+    //    zero lag and the "Grade N" label never flickers between values.
     setSettings({ ...settings, targetGrade: clamped });
-    setGradeSaving(true);
-    const res = (await chrome.runtime.sendMessage({
-      kind: "set_settings",
-      settings: { targetGrade: clamped },
-    })) as BackgroundResponse<ExtensionSettings>;
-    if (res.ok && res.data) setSettings(res.data);
-    setGradeSaving(false);
+    // 2. The persist call is debounced so a drag from 4 -> 12 doesn't fire
+    //    9 background round-trips. We don't read the response back into state -
+    //    local state already reflects the user's intent, and a stale response
+    //    landing AFTER another drag tick was the cause of the previous flicker.
+    if (gradeSaveTimer.current !== null) clearTimeout(gradeSaveTimer.current);
+    gradeSaveTimer.current = window.setTimeout(() => {
+      gradeSaveTimer.current = null;
+      void chrome.runtime.sendMessage({
+        kind: "set_settings",
+        settings: { targetGrade: clamped },
+      });
+    }, 250);
   }
 
   if (loading) {
@@ -220,16 +231,12 @@ export function App() {
       </div>
 
       <div className="card">
-        <div className="label">
-          Hemingway grade target
-          <span style={{ float: "right", color: "#444", fontWeight: 600 }}>
-            Grade {grade}
-            {gradeSaving && (
-              <span className="muted" style={{ marginLeft: 6 }}>
-                saving...
-              </span>
-            )}
-          </span>
+        <div
+          className="label"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}
+        >
+          <span>Hemingway grade target</span>
+          <span style={{ color: "#444", fontWeight: 600 }}>Grade {grade}</span>
         </div>
         <input
           type="range"
