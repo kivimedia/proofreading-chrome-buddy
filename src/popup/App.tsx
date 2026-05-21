@@ -24,7 +24,7 @@ export function App() {
   const [settings, setSettings] = useState<ExtensionSettings | null>(null);
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"fix" | "accept" | null>(null);
+  const [busy, setBusy] = useState<"scan" | "fix" | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [gradeSaving, setGradeSaving] = useState(false);
 
@@ -66,11 +66,21 @@ export function App() {
     }
   }
 
-  async function onFixNow() {
-    // "Fix" = scan now + auto-apply everything in one click. Two-step under
-    // the hood: force a fresh check (skipping debounce), then accept-all
-    // whatever it surfaced. If the check turns up nothing, the accept-all is
-    // a no-op and we tell the user the draft is already clean.
+  /** Refresh = scan only. Runs the suggestion check now, skipping debounce.
+   *  The user can then hover the wavy underlines that appear in the composer
+   *  and accept them one by one. Does NOT apply anything. */
+  async function onScan() {
+    setBusy("scan");
+    setStatus(null);
+    const res = await sendToTab({ kind: "fix_now" });
+    setStatus({ ok: res.ok, text: res.status ?? res.error ?? "Done." });
+    setBusy(null);
+  }
+
+  /** Fix all = scan + apply every suggestion the scan surfaced, in one
+   *  click. Two-step under the hood so the result count is accurate even
+   *  when the scan finds nothing. */
+  async function onFixAll() {
     setBusy("fix");
     setStatus(null);
     const checkRes = await sendToTab({ kind: "fix_now" });
@@ -97,14 +107,6 @@ export function App() {
         text: `Fixed ${applied} issue${applied === 1 ? "" : "s"} in your draft.`,
       });
     }
-    setBusy(null);
-  }
-
-  async function onAcceptAll() {
-    setBusy("accept");
-    setStatus(null);
-    const res = await sendToTab({ kind: "accept_all" });
-    setStatus({ ok: res.ok, text: res.status ?? res.error ?? "Done." });
     setBusy(null);
   }
 
@@ -157,28 +159,56 @@ export function App() {
         <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
           <button
             type="button"
-            className="btn"
-            style={{ flex: 1 }}
+            className="btn ghost"
+            style={{
+              width: 40,
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
             disabled={busy !== null || keyMissing}
-            onClick={onFixNow}
-            title="Run suggestions on the current draft now (skip the typing-pause debounce)"
+            onClick={onScan}
+            title="Scan now: find all issues in the current draft (does not apply anything)"
+            aria-label="Scan for issues"
           >
-            {busy === "fix" ? "Checking..." : "Fix"}
+            {busy === "scan" ? (
+              <span style={{ fontSize: 11 }}>...</span>
+            ) : (
+              // Inline SVG refresh / reload glyph - sharper than a unicode
+              // arrow and keeps colour with currentColor so ghost-button
+              // hover states still apply.
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 12a9 9 0 1 1-3-6.7" />
+                <polyline points="21 4 21 10 15 10" />
+              </svg>
+            )}
           </button>
           <button
             type="button"
             className="btn"
             style={{ flex: 1 }}
             disabled={busy !== null || keyMissing}
-            onClick={onAcceptAll}
-            title="Accept every suggestion currently shown in the draft"
+            onClick={onFixAll}
+            title="Scan the current draft and apply every suggestion in one click"
           >
-            {busy === "accept" ? "Applying..." : "Accept all"}
+            {busy === "fix" ? "Fixing..." : "Fix all"}
           </button>
         </div>
         {status && (
           <div
-            className={status.ok ? "sub" : "sub"}
+            className="sub"
             style={{ marginTop: 8, color: status.ok ? "#0a7f3f" : "#a23030" }}
           >
             {status.text}
