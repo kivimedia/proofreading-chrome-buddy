@@ -176,9 +176,10 @@ export function App() {
             {busy === "scan" ? (
               <span style={{ fontSize: 11 }}>...</span>
             ) : (
-              // Inline SVG refresh / reload glyph - sharper than a unicode
-              // arrow and keeps colour with currentColor so ghost-button
-              // hover states still apply.
+              // Two-arrow "sync" refresh - one arc on top going clockwise,
+              // one arc on bottom going clockwise, each with its own chevron.
+              // Cleaner than a single 3/4-circle arrow whose head sits next
+              // to the path's start point.
               <svg
                 width="16"
                 height="16"
@@ -190,8 +191,10 @@ export function App() {
                 strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <path d="M21 12a9 9 0 1 1-3-6.7" />
-                <polyline points="21 4 21 10 15 10" />
+                <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                <polyline points="21 3 21 8 16 8" />
+                <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                <polyline points="3 21 3 16 8 16" />
               </svg>
             )}
           </button>
