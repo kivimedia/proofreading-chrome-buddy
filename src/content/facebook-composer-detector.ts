@@ -1,5 +1,6 @@
 import { ComposeInstance } from "./compose-instance";
 import { FACEBOOK_CONFIG } from "./paragraph-differ";
+import { installPopupRouter } from "./popup-router";
 import { ensureRewriteController } from "./rewrite-controller";
 
 // Match any contenteditable with role=textbox. We accept both "true" and
@@ -85,6 +86,7 @@ function reapDetached(): void {
 
 function start(): void {
   ensureRewriteController();
+  installPopupRouter(instances);
   scan(document);
   const obs = new MutationObserver((records) => {
     for (const r of records) {

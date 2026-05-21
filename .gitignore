@@ -12,6 +12,21 @@ Thumbs.db
 *.apikey
 **/secrets.json
 
+# Voice profiles are PRIVATE writing/coaching rulesets users bake into the
+# extension via Options -> Voice Profile (Import from file). They live only
+# in the user's chrome.storage.local. Never commit a real voice file - keep
+# it on disk outside the repo (or in a local-only path matched below).
+voice-profile*.md
+voice-profile*.txt
+voice-rules*.md
+voice-rules*.txt
+ori-voice*.md
+ori-voice*.txt
+*.voice.md
+*.voice.txt
+*.private.md
+private/
+
 # Asset build intermediates
 assets/_frames/
 assets/demo-raw.*

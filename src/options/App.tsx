@@ -209,6 +209,101 @@ export function App() {
       </div>
 
       <div className="section">
+        <h2>Voice Profile (private)</h2>
+        <p className="help">
+          Paste your full writing voice / coaching ruleset here. Unlike
+          &quot;Voice samples&quot; above (which only feeds Rewrite + Reply),
+          this is injected into every suggestion, rewrite, and reply draft so
+          the buddy thinks in your voice end-to-end. Useful when you have a
+          structured coaching cassette you want to bake in. Empty = no
+          additional voice instructions.
+        </p>
+        <p className="help" style={{ color: "#a23030", fontWeight: 600 }}>
+          Stored only in this browser&apos;s chrome.storage.local. Never sent
+          anywhere except to Anthropic at request time. Never committed - do
+          NOT paste anything you would not put in a private file.
+        </p>
+        <textarea
+          id="voiceProfile"
+          rows={10}
+          placeholder={
+            "Paste a markdown / plain-text ruleset that describes how you write and coach yourself to write. The longer + more specific, the better the output matches."
+          }
+          value={settings.voiceProfile}
+          onChange={(e) => save({ voiceProfile: e.target.value })}
+        />
+        <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+          <label
+            htmlFor="voice-import"
+            className="btn"
+            style={{ cursor: "pointer", margin: 0 }}
+          >
+            Import from file...
+          </label>
+          <input
+            id="voice-import"
+            type="file"
+            accept=".md,.txt,text/plain,text/markdown"
+            style={{ display: "none" }}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const text = await file.text();
+              await save({ voiceProfile: text });
+              // Reset the input so the same file can be re-imported later.
+              e.target.value = "";
+            }}
+          />
+          {settings.voiceProfile && (
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => {
+                if (
+                  confirm(
+                    "Clear the voice profile? This only clears it in this browser; nothing is sent anywhere.",
+                  )
+                ) {
+                  save({ voiceProfile: "" });
+                }
+              }}
+            >
+              Clear
+            </button>
+          )}
+          <span className="help" style={{ marginLeft: "auto" }}>
+            {settings.voiceProfile
+              ? `${settings.voiceProfile.length.toLocaleString()} characters loaded`
+              : "empty"}
+          </span>
+        </div>
+
+        <label htmlFor="grade" style={{ marginTop: 18 }}>
+          Target reading grade (Hemingway scale)
+        </label>
+        <input
+          id="grade"
+          type="number"
+          min={4}
+          max={14}
+          step={1}
+          value={settings.targetGrade}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            if (Number.isFinite(n)) {
+              save({ targetGrade: Math.max(4, Math.min(14, Math.round(n))) });
+            }
+          }}
+          style={{ width: 80 }}
+        />
+        <p className="help">
+          Claude will target this reading level on every suggestion + rewrite.
+          4 = elementary, 8 = the Hemingway-app default, 14 = college. You can
+          also adjust this from the popup slider.
+        </p>
+      </div>
+
+      <div className="section">
         <h2>Ignore Words</h2>
         <p className="help">
           Words the grammar checker will never flag. Useful for proper nouns,

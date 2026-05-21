@@ -57,6 +57,22 @@ export interface ExtensionSettings {
   customInstructions: string;
   /** Lowercased words/phrases the suggester must never flag. */
   ignoreWords: string[];
+  /** PRIVATE: full coaching/voice ruleset (e.g. how the user has trained their
+   *  writing coach to think). When non-empty, injected into the system prompt
+   *  on ALL surfaces (suggest, rewrite, reply) so suggestions, rewrites, and
+   *  reply drafts match the user's coached voice end-to-end.
+   *
+   *  PRIVACY NOTE FOR FUTURE CONTRIBUTORS: this field's content is highly
+   *  personal. Never commit example content, never log it to console, never
+   *  bundle a fixture with real rules. It lives only in chrome.storage.local
+   *  on the user's machine. The .gitignore at the repo root has patterns
+   *  protecting against accidental commits of voice files. */
+  voiceProfile: string;
+  /** Hemingway-style target reading grade level. Drives the prompt to keep
+   *  every suggestion + explanation at or below this grade. 4 = elementary,
+   *  8 = the Hemingway-app default for general writing, 12 = senior in high
+   *  school. Set to 0 to disable. */
+  targetGrade: number;
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
@@ -72,6 +88,8 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   voiceSamples: "",
   customInstructions: "",
   ignoreWords: [],
+  voiceProfile: "",
+  targetGrade: 8,
 };
 
 export type BackgroundMessage =
@@ -88,6 +106,25 @@ export type BackgroundMessage =
   | { kind: "get_settings" }
   | { kind: "set_settings"; settings: Partial<ExtensionSettings> }
   | { kind: "ignore_word"; word: string };
+
+/** Messages the popup sends DIRECTLY to the active tab's content script
+ *  (not through the background). Content-script listeners route these to the
+ *  most-recently-active ComposeInstance. */
+export type TabMessage =
+  | { kind: "fix_now" }
+  | { kind: "accept_all" };
+
+/** Result of a tab message - content script reports outcome so the popup can
+ *  show feedback (n suggestions applied, no composer focused, etc.). */
+export interface TabResponse {
+  ok: boolean;
+  /** Human-readable status (e.g. "Applied 4 suggestions", "No composer in
+   *  focus", "Fetching new suggestions..."). Shown in the popup. */
+  status?: string;
+  /** Count of suggestions touched, when applicable. */
+  count?: number;
+  error?: string;
+}
 
 export interface BackgroundResponse<T = unknown> {
   ok: boolean;

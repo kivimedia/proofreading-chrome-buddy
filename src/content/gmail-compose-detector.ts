@@ -1,5 +1,6 @@
 import { ComposeInstance } from "./compose-instance";
 import { GMAIL_CONFIG } from "./paragraph-differ";
+import { installPopupRouter } from "./popup-router";
 import { ensureRewriteController } from "./rewrite-controller";
 
 const EDITOR_SELECTOR =
@@ -32,6 +33,7 @@ function reapDetached(): void {
 
 function start(): void {
   ensureRewriteController();
+  installPopupRouter(instances);
   scan(document);
   const obs = new MutationObserver((records) => {
     for (const r of records) {

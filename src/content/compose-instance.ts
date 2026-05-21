@@ -100,6 +100,85 @@ export class ComposeInstance {
     });
   }
 
+  /** Returns true if this composer's editor (or a descendant) currently has
+   *  focus / contains the active element. Used by the popup router to pick
+   *  the right ComposeInstance to dispatch fix_now / accept_all to. */
+  containsActiveElement(): boolean {
+    if (this.destroyed || !this.editor.isConnected) return false;
+    const active = document.activeElement;
+    if (!active) return false;
+    return this.editor === active || this.editor.contains(active);
+  }
+
+  /** Returns the number of suggestions currently being rendered as wavy
+   *  underlines (i.e. not dismissed/accepted yet). Used by the popup to show
+   *  "Accept all (N)" with an accurate count and to gray the button out when
+   *  there's nothing to accept. */
+  pendingCount(): number {
+    if (this.destroyed || !this.editor.isConnected) return 0;
+    const snap = snapshotEditor(this.editor, this.config);
+    let n = 0;
+    for (const para of snap.paragraphs) {
+      const sugs = this.suggestionsByHash.get(para.hash);
+      if (!sugs?.length) continue;
+      for (const s of sugs) {
+        const key = suggestionKey(para.hash, s);
+        if (!this.dismissed.has(key)) n++;
+      }
+    }
+    return n;
+  }
+
+  /** Public "Fix now" trigger: cancel any pending debounce and run a check
+   *  immediately. If a check is already in flight, queues a re-run so the
+   *  user always gets fresh suggestions after this returns. */
+  async forceCheck(): Promise<void> {
+    if (this.destroyed) return;
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    await this.runCheck();
+  }
+
+  /** Public "Accept all" trigger: applies every currently-rendered, non-
+   *  dismissed suggestion in this composer. Returns the number applied so
+   *  the popup can show "Applied N suggestions". Applies in REVERSE document
+   *  order within each paragraph so earlier offsets stay valid as later ones
+   *  are replaced - critical for multi-suggestion paragraphs. */
+  acceptAll(): number {
+    if (this.destroyed || !this.editor.isConnected) return 0;
+    const snap = snapshotEditor(this.editor, this.config);
+    let applied = 0;
+    // Walk paragraphs forward, but within each paragraph apply in reverse
+    // offset order so applying suggestion at position 50 doesn't invalidate
+    // the offset for suggestion at position 10. Doing this naively across
+    // paragraphs would still be safe because paragraphs are independent
+    // blocks, but per-paragraph reverse is the cleanest insurance.
+    for (let i = 0; i < snap.paragraphs.length; i++) {
+      const para = snap.paragraphs[i];
+      const block = snap.paragraphNodes[i];
+      const sugs = this.suggestionsByHash.get(para.hash);
+      if (!sugs?.length) continue;
+      const sorted = [...sugs].sort((a, b) => b.start - a.start);
+      for (const s of sorted) {
+        const key = suggestionKey(para.hash, s);
+        if (this.dismissed.has(key)) continue;
+        const range = findRangeInBlock(block, s.start, s.end);
+        if (!range) continue;
+        try {
+          insertTextIntoEditor(this.editor, range, s.replacement);
+          this.dismissed.add(key);
+          applied++;
+        } catch (err) {
+          console.warn("[proofreading-chrome-buddy] accept-all failed for one suggestion:", err);
+        }
+      }
+    }
+    if (applied > 0) this.repaint();
+    return applied;
+  }
+
   private async runCheck(): Promise<void> {
     if (this.destroyed) return;
     if (!this.settings?.apiKey) return;
