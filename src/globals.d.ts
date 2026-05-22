@@ -7,6 +7,10 @@
  * On other contributors' machines the file is absent and the value is `null`.
  */
 declare const __BOOTSTRAP_VOICE__: {
+  /** Monotonic version of the bootstrap content. Bump when voice profile
+   *  or custom-instructions content changes meaningfully. Service worker
+   *  re-seeds when the user's stored bootstrap version is below this. */
+  version?: number;
   voiceProfile?: string;
   customInstructions?: string;
   ignoreWords?: string[];

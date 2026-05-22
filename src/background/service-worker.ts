@@ -25,6 +25,14 @@ import {
 
 const SETTINGS_KEY = "settings";
 const USAGE_KEY = "usage";
+/**
+ * Stored bootstrap version. Compared against __BOOTSTRAP_VOICE__.version on
+ * each service-worker startup; when the embedded number is higher (a new
+ * build shipped fresh voice content), we re-seed and overwrite. Lives
+ * separate from `settings` so a user clearing their voice profile through
+ * the UI doesn't accidentally re-trigger the seed.
+ */
+const BOOTSTRAP_VERSION_KEY = "bootstrapVersion";
 
 async function getSettings(): Promise<ExtensionSettings> {
   const stored = await chrome.storage.local.get(SETTINGS_KEY);
@@ -367,41 +375,54 @@ chrome.runtime.onMessage.addListener(
  * src/globals.d.ts.)
  */
 async function maybeBootstrapVoice(): Promise<void> {
-  // typeof check makes the dead-code-elimination path obvious when the
-  // define is `null` at build time.
   const seed = typeof __BOOTSTRAP_VOICE__ !== "undefined" ? __BOOTSTRAP_VOICE__ : null;
   if (!seed) return;
+  const seedVersion = typeof seed.version === "number" ? seed.version : 1;
+  const stored = await chrome.storage.local.get(BOOTSTRAP_VERSION_KEY);
+  const storedVersion = (stored[BOOTSTRAP_VERSION_KEY] as number | undefined) ?? 0;
+
+  // Reasons to seed:
+  //   (a) we've never seeded before (storedVersion === 0)
+  //   (b) the embedded build has a newer version - overwrite voiceProfile +
+  //       customInstructions, union-dedupe ignoreWords. This is the path
+  //       that ships voice trims/edits without requiring the user to do
+  //       anything but click reload in chrome://extensions.
+  if (storedVersion >= seedVersion) return;
+  const isFirstSeed = storedVersion === 0;
   const current = await getSettings();
-  if ((current.voiceProfile ?? "").trim().length > 0) return; // user already has one
+
+  // If this is the first seed AND the user already had a voiceProfile
+  // (loaded manually before bootstrap shipped), respect it - just record
+  // the version so future bumps can take over cleanly.
+  if (isFirstSeed && (current.voiceProfile ?? "").trim().length > 0) {
+    await chrome.storage.local.set({ [BOOTSTRAP_VERSION_KEY]: seedVersion });
+    return;
+  }
+
   const merged: Partial<ExtensionSettings> = {};
   if (typeof seed.voiceProfile === "string" && seed.voiceProfile.trim()) {
     merged.voiceProfile = seed.voiceProfile;
   }
-  // Only seed customInstructions if empty - never overwrite a user edit.
-  if (
-    typeof seed.customInstructions === "string" &&
-    seed.customInstructions.trim() &&
-    !(current.customInstructions ?? "").trim()
-  ) {
+  if (typeof seed.customInstructions === "string" && seed.customInstructions.trim()) {
     merged.customInstructions = seed.customInstructions;
   }
-  // Ignore words: union, dedupe (case-insensitive).
   if (Array.isArray(seed.ignoreWords) && seed.ignoreWords.length > 0) {
     const have = new Set(current.ignoreWords.map((w) => w.toLowerCase()));
     const additions = seed.ignoreWords.filter(
       (w) => typeof w === "string" && w.trim() && !have.has(w.toLowerCase()),
     );
-    if (additions.length > 0) {
-      merged.ignoreWords = [...current.ignoreWords, ...additions];
-    }
+    merged.ignoreWords = [...current.ignoreWords, ...additions];
   }
-  if (Object.keys(merged).length === 0) return;
-  await setSettings(merged);
+  if (Object.keys(merged).length > 0) {
+    await setSettings(merged);
+  }
+  await chrome.storage.local.set({ [BOOTSTRAP_VERSION_KEY]: seedVersion });
   console.log(
-    "[proofreading-chrome-buddy] voice bootstrap loaded into chrome.storage.local " +
+    `[proofreading-chrome-buddy] voice bootstrap v${seedVersion} applied ` +
       `(voiceProfile=${(merged.voiceProfile ?? "").length} chars, ` +
       `customInstructions=${(merged.customInstructions ?? "").length} chars, ` +
-      `ignoreWords += ${(merged.ignoreWords ?? []).length - current.ignoreWords.length})`,
+      `ignoreWords=${(merged.ignoreWords ?? current.ignoreWords).length} total). ` +
+      `Previous stored version: ${storedVersion}.`,
   );
 }
 
