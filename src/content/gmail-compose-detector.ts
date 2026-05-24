@@ -3,8 +3,16 @@ import { GMAIL_CONFIG } from "./paragraph-differ";
 import { installPopupRouter } from "./popup-router";
 import { ensureRewriteController } from "./rewrite-controller";
 
-const EDITOR_SELECTOR =
-  '[contenteditable="true"][aria-label*="Message Body"], [contenteditable="true"][g_editable="true"]';
+// Multi-selector so we survive Gmail UI locale changes (aria-label localizes
+// per language) and the eventual deprecation of `g_editable`. The third entry
+// matches Gmail's ARIA-compliant body editor by structure (multiline textbox
+// that is contenteditable) and works regardless of language or DOM rename.
+// `i` flag on the aria-label selector tolerates "Message Body" vs "Message body".
+const EDITOR_SELECTOR = [
+  '[contenteditable="true"][aria-label*="Message Body" i]',
+  '[contenteditable="true"][g_editable="true"]',
+  '[contenteditable="true"][role="textbox"][aria-multiline="true"]',
+].join(", ");
 
 const instances = new Map<HTMLElement, ComposeInstance>();
 
