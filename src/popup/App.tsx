@@ -15,6 +15,7 @@ const MODEL_PRICING_USD_PER_MTOK: Record<
   "claude-haiku-4-5-20251001": { input: 1, output: 5, cache_read: 0.1 },
   "claude-sonnet-4-6": { input: 3, output: 15, cache_read: 0.3 },
   "claude-opus-4-7": { input: 15, output: 75, cache_read: 1.5 },
+  "claude-opus-4-8": { input: 15, output: 75, cache_read: 1.5 },
 };
 
 const MIN_GRADE = 2;
@@ -344,5 +345,7 @@ function modelLabel(m: ModelId): string {
       return "Sonnet 4.6";
     case "claude-opus-4-7":
       return "Opus 4.7";
+    case "claude-opus-4-8":
+      return "Opus 4.8";
   }
 }

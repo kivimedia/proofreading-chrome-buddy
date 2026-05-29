@@ -148,6 +148,9 @@ export function App() {
           <option value="claude-sonnet-4-6">
             Claude Sonnet 4.6 (higher quality, ~5x cost)
           </option>
+          <option value="claude-opus-4-8">
+            Claude Opus 4.8 (best quality, latest, ~20x cost)
+          </option>
           <option value="claude-opus-4-7">
             Claude Opus 4.7 (best quality, ~20x cost)
           </option>
